@@ -1,0 +1,6 @@
+{
+  "name": "Jo1 - منصة الفيديوهات القصيرة",
+  "description": "منصة الفيديوهات القصيرة الذكية والحديثة المشابهة لتيك توك مع ميزات النشر والمتابعة والتفاعل الكامل",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
