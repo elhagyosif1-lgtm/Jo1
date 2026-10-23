@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Radio, Search, Volume2, VolumeX, Globe } from 'lucide-react';
+import { AuthModal } from './AuthModal';
 
 export const TopHeader: React.FC = () => {
   const {
@@ -77,8 +78,9 @@ export const TopHeader: React.FC = () => {
         </button>
       </div>
 
-      {/* Right zone: Search & Language Toggle */}
+      {/* Right zone: Search, account & language toggle */}
       <div className="flex items-center gap-2 pointer-events-auto">
+        <AuthModal />
         <button
           onClick={() => setActiveTab('discover')}
           className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 active:scale-95 transition-transform"
