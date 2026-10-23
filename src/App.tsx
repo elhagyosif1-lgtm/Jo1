@@ -16,6 +16,7 @@ import { GiftAnimationOverlay } from './components/GiftAnimationOverlay';
 import { WalletModal } from './components/WalletModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AdminBackstageModal } from './components/AdminBackstageModal';
+import { GiftModal } from './components/GiftModal';
 import {
   Compass,
   TrendingUp,
@@ -407,6 +408,7 @@ const AppContent: React.FC = () => {
       {/* Global Interactive Modals */}
       <CommentsModal />
       <ShareModal />
+      <GiftModal />
       <SoundDetailModal />
       <WalletModal
         isOpen={isWalletModalOpen}

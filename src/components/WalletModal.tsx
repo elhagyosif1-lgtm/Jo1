@@ -37,6 +37,7 @@ import {
   MASKED_VODAFONE_MERCHANT_WALLET,
   VodafoneCashError
 } from '../services/vodafoneCashService';
+import { checkSupabaseConnection } from '../services/supabaseService';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -44,12 +45,21 @@ interface WalletModalProps {
 }
 
 export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
-  const { wallet, depositCoins, withdrawCash } = useApp();
+  const { wallet, depositCoins, withdrawCash, updateWalletDetails } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'balance' | 'deposit' | 'withdraw' | 'study' | 'history'>('balance');
+  const [activeTab, setActiveTab] = useState<'balance' | 'deposit' | 'withdraw' | 'link' | 'study' | 'history'>('balance');
   const [withdrawMethod, setWithdrawMethod] = useState<'vodafone_cash' | 'bank_iban'>('vodafone_cash');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('25');
   const [showFullPhone, setShowFullPhone] = useState(false);
+
+  // Link Wallet state
+  const [linkPhone, setLinkPhone] = useState<string>(wallet.vodafoneCashNumber || OFFICIAL_VODAFONE_MERCHANT_WALLET);
+  const [linkIban, setLinkIban] = useState<string>(wallet.linkedIban || '');
+  const [linkSavedToast, setLinkSavedToast] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<{ checked: boolean; connected: boolean; message?: string }>({
+    checked: false,
+    connected: false,
+  });
 
   // Deposit state
   const [selectedDepositPkg, setSelectedDepositPkg] = useState<{ coins: number; priceUsd: number; label: string } | null>(null);
@@ -285,7 +295,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
         </div>
 
         {/* Tab Controls */}
-        <div className="grid grid-cols-5 gap-1 p-1 bg-neutral-950 border border-neutral-800 rounded-xl my-3 text-[11px] font-bold">
+        <div className="grid grid-cols-6 gap-1 p-1 bg-neutral-950 border border-neutral-800 rounded-xl my-3 text-[11px] font-bold">
           <button
             onClick={() => {
               setActiveTab('balance');
@@ -311,7 +321,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
               activeTab === 'deposit' ? 'bg-amber-600 text-white shadow-sm' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            شحن كاش
+            شحن
           </button>
           <button
             onClick={() => {
@@ -323,7 +333,20 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
               activeTab === 'withdraw' ? 'bg-rose-600 text-white shadow-sm' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            سحب أرباح
+            سحب
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('link');
+              setLinkPhone(wallet.vodafoneCashNumber || OFFICIAL_VODAFONE_MERCHANT_WALLET);
+              setLinkIban(wallet.linkedIban || '');
+              checkSupabaseConnection().then(res => setSupabaseStatus({ checked: true, connected: res.connected, message: res.error })).catch(() => {});
+            }}
+            className={`py-2 rounded-lg transition-all ${
+              activeTab === 'link' ? 'bg-emerald-600 text-white shadow-sm' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            ربط المحفظة
           </button>
           <button
             onClick={() => setActiveTab('study')}
@@ -331,7 +354,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
               activeTab === 'study' ? 'bg-cyan-600 text-white shadow-sm' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            دراسة الأرباح
+            دراسة
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -1091,6 +1114,126 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: Link Wallet & Accounts */}
+          {activeTab === 'link' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-neutral-900 border border-emerald-500/40 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-emerald-400" />
+                  <h4 className="text-sm font-bold text-white">ربط وتوثيق محفظة فودافون كاش</h4>
+                </div>
+                <p className="text-xs text-neutral-300">
+                  اربط رقم هاتفك المصري المسجل في فودافون كاش أو شبكة المحافظ الذكية لاستقبال الأرباح وإجراء الإيداعات الفورية.
+                </p>
+              </div>
+
+              {linkSavedToast && (
+                <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>تم حفظ وتحديث بيانات المحفظة بنجاح وتأكيد الربط!</span>
+                </div>
+              )}
+
+              {/* Vodafone Cash Phone Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-300 flex items-center justify-between">
+                  <span>رقم الهاتف المعتمد (فودافون كاش / أورنج / اتصالات / WE):</span>
+                  {linkPhone && (
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      validateEgyptianPhoneNumber(linkPhone).isValid
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                    }`}>
+                      {validateEgyptianPhoneNumber(linkPhone).carrier !== 'Unknown'
+                        ? `شبكة ${validateEgyptianPhoneNumber(linkPhone).carrier}`
+                        : 'رقم غير مكتمل'}
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={linkPhone}
+                    onChange={e => setLinkPhone(e.target.value)}
+                    placeholder="01012345678"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-sm font-mono text-white outline-none focus:border-emerald-500"
+                  />
+                  <Phone className="w-4 h-4 text-neutral-500 absolute left-3 top-3.5" />
+                </div>
+                {linkPhone && !validateEgyptianPhoneNumber(linkPhone).isValid && (
+                  <p className="text-[11px] text-red-400 font-medium">
+                    {validateEgyptianPhoneNumber(linkPhone).errorMessage}
+                  </p>
+                )}
+              </div>
+
+              {/* IBAN Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-300 flex items-center justify-between">
+                  <span>رقم الآيبان البنكي للتحويلات المباشرة (IBAN):</span>
+                  <span className="text-[10px] text-neutral-500">اختياري للسحب البنكي</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={linkIban}
+                    onChange={e => setLinkIban(e.target.value)}
+                    placeholder="EG80 4000 0000 1234 5678 9012"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-sm font-mono text-white outline-none focus:border-emerald-500"
+                  />
+                  <Building2 className="w-4 h-4 text-neutral-500 absolute left-3 top-3.5" />
+                </div>
+              </div>
+
+              {/* Backend Database Status */}
+              <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white">حالة الاتصال بقاعدة البيانات ومحفظة Jo1:</span>
+                  </div>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    supabaseStatus.connected
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    {supabaseStatus.connected ? 'متصل بقاعدة البيانات' : 'وضع المحفظة المحلية الموثقة'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-400">
+                  {supabaseStatus.connected
+                    ? 'المحفظة متزامنة لحظياً مع جداول profiles و wallets وجاهزة للعمليات الحقيقية.'
+                    : 'الرصيد والمعاملات محفوظة وموثقة محلياً ومؤمنة بقفل المعاملات الذري.'}
+                </p>
+              </div>
+
+              {/* Save & Confirm Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const validated = validateEgyptianPhoneNumber(linkPhone);
+                  if (!validated.isValid) {
+                    alert(validated.errorMessage || 'يرجى إدخال رقم هاتف مصري صحيح');
+                    return;
+                  }
+                  updateWalletDetails({
+                    vodafoneCashNumber: validated.formattedNumber,
+                    linkedIban: linkIban.trim(),
+                  });
+                  setLinkSavedToast(true);
+                  playSuccessChime();
+                  setTimeout(() => setLinkSavedToast(false), 3000);
+                }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>حفظ وتأكيد ربط المحفظة</span>
+              </button>
             </div>
           )}
 

@@ -45,7 +45,7 @@ export const MASKED_VODAFONE_MERCHANT_WALLET = '010*****514';
  * Validates Egyptian Mobile Numbers (11 digits, starts with 010, 011, 012, or 015)
  */
 export function validateEgyptianPhoneNumber(phone: string): VodafoneValidationResult {
-  const cleanPhone = phone.replace(/[\s\-\+]/g, '').replace(/^20/, '0');
+  const cleanPhone = (phone || '').replace(/[\s\-\+]/g, '').replace(/^20/, '0');
 
   if (!cleanPhone) {
     return {
@@ -171,14 +171,15 @@ export async function processVodafoneCashTransaction(
     const amountEgp = Math.round(amountUsd * USD_TO_EGP_RATE);
     const amountCoins = Math.round(amountUsd / 0.005);
     const refCode = generateTransactionReference(type === 'deposit' ? 'DEP' : 'WTH');
-    const ussdCode = generateVodafoneCashUSSD(amountEgp, OFFICIAL_VODAFONE_MERCHANT_WALLET);
+    const targetWallet = type === 'deposit' ? OFFICIAL_VODAFONE_MERCHANT_WALLET : phoneValidation.formattedNumber;
+    const ussdCode = generateVodafoneCashUSSD(amountEgp, targetWallet);
 
     return {
       amountUsd,
       amountCoins,
       amountEgp,
-      senderPhone: phoneValidation.formattedNumber,
-      targetWallet: OFFICIAL_VODAFONE_MERCHANT_WALLET,
+      senderPhone: type === 'deposit' ? phoneValidation.formattedNumber : OFFICIAL_VODAFONE_MERCHANT_WALLET,
+      targetWallet,
       transactionReference: refCode,
       ussdCode,
       timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),

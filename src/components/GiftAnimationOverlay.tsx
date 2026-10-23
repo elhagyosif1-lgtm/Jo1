@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { GiftItem } from '../types';
-import { Sparkles, Crown, Flame, Gem } from 'lucide-react';
+import { Sparkles, Crown, Flame, Gem, X } from 'lucide-react';
 
 interface GiftAnimationOverlayProps {
   gift: GiftItem | null;
@@ -25,6 +25,9 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
         const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         const now = ctx.currentTime;
 
         if (gift.animationType === 'lion_king' || gift.animationType === 'tiger') {
@@ -170,18 +173,28 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
   if (!gift) return null;
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 z-[999] pointer-events-none flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-300">
+      {/* Dismiss button */}
+      <button
+        onClick={onAnimationEnd}
+        className="pointer-events-auto absolute top-5 right-5 z-20 p-2.5 rounded-full bg-black/70 hover:bg-black/90 text-white/90 hover:text-white border border-white/20 shadow-2xl transition-all"
+        title="إغلاق التأثير"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
       {/* Dynamic Particle Canvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
       {/* Screen flash / shockwave */}
-      <div className="absolute inset-0 bg-radial-gradient from-amber-600/30 via-rose-950/20 to-black/70 animate-pulse" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-amber-600/25 via-rose-950/20 to-black/70 animate-pulse pointer-events-none" />
 
       {/* Top Banner Announcement */}
-      <div className="relative z-10 -translate-y-20 max-w-md mx-4 px-6 py-3 rounded-2xl bg-black/85 backdrop-blur-2xl border border-amber-400/60 shadow-[0_0_50px_rgba(245,158,11,0.6)] flex items-center gap-3 animate-bounce">
+      <div className="relative z-10 mb-6 max-w-md mx-4 px-6 py-3 rounded-2xl bg-black/90 backdrop-blur-2xl border border-amber-400/70 shadow-[0_0_50px_rgba(245,158,11,0.6)] flex items-center gap-3 animate-bounce">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-cyan-400 p-0.5 flex items-center justify-center shrink-0 shadow-lg">
           <div className="w-full h-full bg-black rounded-[10px] flex items-center justify-center">
-            <span className="text-xs font-black text-amber-400">52</span>
+            <span className="text-xs font-black text-amber-400">{senderLevel}</span>
           </div>
         </div>
 
@@ -189,7 +202,7 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
           <div className="flex items-center gap-1.5">
             <Crown className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-xs font-black text-amber-300 truncate">
-              الداعم الإمبراطوري {senderName}
+              الداعم {senderName}
             </span>
             <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-[9px] font-black text-white">
               LVL {senderLevel}
@@ -202,16 +215,16 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
       </div>
 
       {/* Center 3D Realistic Holographic Model Showcase */}
-      <div className="relative z-10 flex flex-col items-center scale-110 sm:scale-130 transition-transform animate-in zoom-in-75 duration-500">
+      <div className="relative z-10 flex flex-col items-center scale-100 sm:scale-120 transition-transform animate-in zoom-in-75 duration-500">
         {/* Orbital Energy Rings */}
-        <div className="absolute -inset-12 rounded-full border-4 border-amber-400/40 animate-spin-slow" />
-        <div className="absolute -inset-20 rounded-full border-2 border-cyan-400/30" />
-        <div className="absolute -inset-8 rounded-full bg-gradient-to-tr from-amber-500/30 via-rose-600/30 to-purple-600/30 blur-3xl animate-pulse" />
+        <div className="absolute -inset-10 rounded-full border-4 border-amber-400/40 animate-spin-slow" />
+        <div className="absolute -inset-16 rounded-full border-2 border-cyan-400/30" />
+        <div className="absolute -inset-6 rounded-full bg-gradient-to-tr from-amber-500/30 via-rose-600/30 to-purple-600/30 blur-3xl animate-pulse" />
 
         {/* 3D Realistic Model Box */}
-        <div className="relative w-44 h-44 rounded-3xl bg-gradient-to-tr from-black via-neutral-900 to-amber-950/90 border-2 border-amber-400 p-4 shadow-[0_0_90px_rgba(245,158,11,0.9)] flex flex-col items-center justify-center">
+        <div className="relative w-40 h-40 sm:w-44 sm:h-44 rounded-3xl bg-gradient-to-tr from-black via-neutral-900 to-amber-950/90 border-2 border-amber-400 p-4 shadow-[0_0_90px_rgba(245,158,11,0.9)] flex flex-col items-center justify-center">
           {/* Main Visual Asset / 3D Icon */}
-          <span className="text-8xl drop-shadow-[0_0_35px_rgba(255,255,255,0.9)] animate-bounce select-none">
+          <span className="text-7xl sm:text-8xl drop-shadow-[0_0_35px_rgba(255,255,255,0.9)] animate-bounce select-none">
             {gift.emoji}
           </span>
 
@@ -228,7 +241,7 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
         </div>
 
         {/* Title & Valuation */}
-        <div className="mt-7 text-center max-w-sm px-4">
+        <div className="mt-6 text-center max-w-sm px-4">
           <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-cyan-300 drop-shadow-xl">
             {gift.nameAr}
           </h3>
@@ -236,7 +249,7 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
             {gift.descriptionAr}
           </p>
 
-          <div className="inline-flex items-center gap-3 mt-2 px-4 py-1.5 rounded-full bg-black/70 border border-amber-400/50 shadow-lg text-xs font-black tabular-nums">
+          <div className="inline-flex items-center gap-2.5 mt-2.5 px-4 py-1.5 rounded-full bg-black/80 border border-amber-400/50 shadow-lg text-xs font-black tabular-nums">
             <span className="text-amber-300 flex items-center gap-1">
               <Gem className="w-3.5 h-3.5 text-amber-400" />
               <span>{gift.costCoins.toLocaleString()} عملة</span>
@@ -247,7 +260,7 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
             </span>
             <span className="text-neutral-500">|</span>
             <span className="text-cyan-300 text-[10px]">
-              نصيب المذيع 70%: ${(gift.costCoins * 0.005 * 0.7).toFixed(2)}
+              المذيع: ${(gift.costCoins * 0.005 * 0.7).toFixed(2)}
             </span>
           </div>
         </div>

@@ -29,6 +29,7 @@ export const LiveStreamView: React.FC = () => {
     triggerGiftAnimation,
     wallet,
     setIsWalletModalOpen,
+    currentUser,
   } = useApp();
 
   const [messages, setMessages] = useState<LiveMessage[]>([
@@ -101,13 +102,18 @@ export const LiveStreamView: React.FC = () => {
   };
 
   const handleFireGift = (gift: GiftItem) => {
-    triggerGiftAnimation(gift);
+    const success = triggerGiftAnimation(gift);
+    if (!success) {
+      alert(`رصيدك المتاح (${wallet.coinsBalance.toLocaleString()} عملة) لا يكفي لإرسال ${gift.nameAr}. اضغط على المحفظة لشحن الرصيد.`);
+      setIsWalletModalOpen(true);
+      return;
+    }
     setMessages(prev => [
       ...prev,
       {
         id: `gift-${Date.now()}`,
-        user: 'الداعم يوسف الحج [LVL 52]',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+        user: `${currentUser.displayName} [LVL ${currentUser.supporterLevel || 52}]`,
+        avatar: currentUser.avatarUrl,
         text: `أطلق هدية أثر: ${gift.nameAr} (${gift.costCoins.toLocaleString()} عملة)! 💥`,
         isGift: true,
       },

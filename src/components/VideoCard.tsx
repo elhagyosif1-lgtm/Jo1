@@ -14,13 +14,15 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
-  Lock
+  Lock,
+  Gift
 } from 'lucide-react';
 
 interface VideoCardProps {
   video: VideoItem;
   isActive: boolean;
   onHashtagClick?: (tag: string) => void;
+  onVideoEnded?: () => void;
 }
 
 interface FloatingHeart {
@@ -29,7 +31,7 @@ interface FloatingHeart {
   y: number;
 }
 
-export const VideoCard: React.FC<VideoCardProps> = ({ video, isActive, onHashtagClick }) => {
+export const VideoCard: React.FC<VideoCardProps> = ({ video, isActive, onHashtagClick, onVideoEnded }) => {
   const {
     likedVideoIds,
     toggleLike,
@@ -39,11 +41,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isActive, onHashtag
     toggleFollow,
     setActiveCommentsModalVideoId,
     setActiveShareModalVideo,
+    setActiveGiftModalVideo,
     setActiveSoundModal,
     isMuted,
     toggleMute,
     setActiveTab,
     setSearchQuery,
+    autoAdvanceVideos,
   } = useApp();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -211,10 +215,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isActive, onHashtag
         src={streamUrl}
         poster={video.posterUrl}
         playsInline
-        loop
+        loop={!autoAdvanceVideos}
         preload="auto"
         muted={isMuted}
         onTimeUpdate={handleTimeUpdate}
+        onEnded={() => {
+          if (autoAdvanceVideos && onVideoEnded) {
+            onVideoEnded();
+          }
+        }}
         onWaiting={() => setIsBuffering(true)}
         onCanPlay={() => setIsBuffering(false)}
         onLoadedData={() => setIsBuffering(false)}
@@ -384,6 +393,23 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isActive, onHashtag
           </div>
           <span className="text-xs font-bold text-white drop-shadow-md tabular-nums">
             {formatNumber(video.stats.bookmarks)}
+          </span>
+        </button>
+
+        {/* Gift Button */}
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            setActiveGiftModalVideo(video);
+          }}
+          className="group flex flex-col items-center gap-1 active:scale-75 transition-transform"
+          title="إرسال هدية للمنشئ"
+        >
+          <div className="p-2.5 rounded-full text-amber-400 hover:text-amber-300 transition-colors bg-gradient-to-tr from-amber-500/20 to-rose-600/20 border border-amber-400/40 shadow-lg group-hover:scale-110">
+            <Gift className="w-8 h-8 drop-shadow-[0_0_12px_rgba(245,158,11,0.6)]" />
+          </div>
+          <span className="text-xs font-bold text-amber-300 drop-shadow-md">
+            هدية
           </span>
         </button>
 

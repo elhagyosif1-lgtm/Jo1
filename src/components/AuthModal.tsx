@@ -17,7 +17,7 @@ function errorMessage(error: unknown): string {
 }
 
 export const AuthModal: React.FC = () => {
-  const { currentUser, updateCurrentUser, language } = useApp();
+  const { currentUser, updateCurrentUser, language, setExactCoinsBalance } = useApp();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -43,6 +43,10 @@ export const AuthModal: React.FC = () => {
         isVerified: false,
         bio: profile?.is_banned ? 'الحساب موقوف' : 'عضو في منصة Jo1',
       });
+      const walletRecord = await getWallet(nextSession.user.id);
+      if (walletRecord && typeof walletRecord.coins === 'number') {
+        setExactCoinsBalance(walletRecord.coins);
+      }
     } catch (e) {
       setError(errorMessage(e));
     }

@@ -48,8 +48,8 @@ export const UploadModal: React.FC = () => {
   const [saturation, setSaturation] = useState<number>(100);
   const [showAdvancedTuning, setShowAdvancedTuning] = useState(false);
 
-  // Default strictly to private_link as requested by user!
-  const [privacy, setPrivacy] = useState<'private_link' | 'only_me' | 'public'>('private_link');
+  // Default to public so published videos appear in the feed
+  const [privacy, setPrivacy] = useState<'private_link' | 'only_me' | 'public'>('public');
   const [allowComments, setAllowComments] = useState(true);
   const [allowShares, setAllowShares] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);

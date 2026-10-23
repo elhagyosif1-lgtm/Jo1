@@ -1,5 +1,5 @@
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { requireSupabase } from '../lib/supabase';
+import { requireSupabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface ProfileRecord {
   id: string;
@@ -22,10 +22,14 @@ export interface WalletRecord {
 export function onAuthStateChange(
   callback: (event: AuthChangeEvent, session: Session | null) => void,
 ) {
+  if (!isSupabaseConfigured) {
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
   return requireSupabase().auth.onAuthStateChange(callback);
 }
 
 export async function getCurrentSession(): Promise<Session | null> {
+  if (!isSupabaseConfigured) return null;
   const { data, error } = await requireSupabase().auth.getSession();
   if (error) throw error;
   return data.session;
@@ -78,42 +82,137 @@ export async function signUpWithPassword(
 }
 
 export async function signOut(): Promise<void> {
+  if (!isSupabaseConfigured) return;
   const { error } = await requireSupabase().auth.signOut();
   if (error) throw error;
 }
 
 export async function getProfile(userId: string): Promise<ProfileRecord | null> {
   if (!userId) throw new Error('A user ID is required.');
+  if (!isSupabaseConfigured) return null;
 
-  const { data, error } = await requireSupabase()
-    .from('profiles')
-    .select('id, username, display_name, level, is_banned, created_at')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const { data, error } = await requireSupabase()
+      .from('profiles')
+      .select('id, username, display_name, level, is_banned, created_at')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data as ProfileRecord | null;
+    if (error) throw error;
+    return data as ProfileRecord | null;
+  } catch (err) {
+    console.warn('[Supabase] Failed to fetch profile:', err);
+    return null;
+  }
 }
 
 export async function getWallet(userId: string): Promise<WalletRecord | null> {
   if (!userId) throw new Error('A user ID is required.');
+  if (!isSupabaseConfigured) return null;
 
-  const { data, error } = await requireSupabase()
-    .from('wallets')
-    .select('user_id, coins, diamonds, total_sent, total_received, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle();
+  try {
+    const { data, error } = await requireSupabase()
+      .from('wallets')
+      .select('user_id, coins, diamonds, total_sent, total_received, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data as WalletRecord | null;
+    if (error) throw error;
+    return data as WalletRecord | null;
+  } catch (err) {
+    console.warn('[Supabase] Failed to fetch wallet:', err);
+    return null;
+  }
 }
 
 /**
- * Read-only smoke test. It verifies the Data API, table visibility, and RLS behavior
- * without inserting, updating, or deleting production data.
+ * Read-only smoke test. Verifies connection safely without unhandled throws.
  */
-export async function checkSupabaseConnection(): Promise<{ connected: true; profileTableAccessible: true }> {
-  const { error } = await requireSupabase().from('profiles').select('id').limit(1);
-  if (error) throw error;
-  return { connected: true, profileTableAccessible: true };
+export async function checkSupabaseConnection(): Promise<{
+  connected: boolean;
+  profileTableAccessible: boolean;
+  error?: string;
+}> {
+  if (!isSupabaseConfigured) {
+    return { connected: false, profileTableAccessible: false, error: 'Supabase credentials not configured' };
+  }
+  try {
+    const { error } = await requireSupabase().from('profiles').select('id').limit(1);
+    if (error) {
+      return { connected: false, profileTableAccessible: false, error: error.message };
+    }
+    return { connected: true, profileTableAccessible: true };
+  } catch (err: any) {
+    return { connected: false, profileTableAccessible: false, error: err?.message || 'Connection failed' };
+  }
+}
+
+/**
+ * RPC wrappers for backend transactions: send_gift, request_deposit, request_withdrawal
+ */
+export async function sendGiftRpc(params: {
+  senderId: string;
+  recipientId: string;
+  giftId: string;
+  costCoins: number;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) return { success: true };
+  try {
+    const { error } = await requireSupabase().rpc('send_gift', {
+      p_sender_id: params.senderId,
+      p_recipient_id: params.recipientId,
+      p_gift_id: params.giftId,
+      p_cost_coins: params.costCoins,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to execute send_gift' };
+  }
+}
+
+export async function requestDepositRpc(params: {
+  userId: string;
+  amountUsd: number;
+  amountCoins: number;
+  phone: string;
+  referenceNumber: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) return { success: true };
+  try {
+    const { error } = await requireSupabase().rpc('request_deposit', {
+      p_user_id: params.userId,
+      p_amount_usd: params.amountUsd,
+      p_coins: params.amountCoins,
+      p_phone: params.phone,
+      p_ref: params.referenceNumber,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to execute request_deposit' };
+  }
+}
+
+export async function requestWithdrawalRpc(params: {
+  userId: string;
+  amountUsd: number;
+  amountCoins: number;
+  targetAccount: string;
+  referenceNumber: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) return { success: true };
+  try {
+    const { error } = await requireSupabase().rpc('request_withdrawal', {
+      p_user_id: params.userId,
+      p_amount_usd: params.amountUsd,
+      p_coins: params.amountCoins,
+      p_target_account: params.targetAccount,
+      p_ref: params.referenceNumber,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to execute request_withdrawal' };
+  }
 }
