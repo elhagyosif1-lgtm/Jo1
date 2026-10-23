@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { GiftItem } from '../types';
-import { Sparkles, Crown, Flame, Gem, X } from 'lucide-react';
+import { Sparkles, Crown, Flame, Gem, X, Zap, Shield, Orbit } from 'lucide-react';
 
 interface GiftAnimationOverlayProps {
   gift: GiftItem | null;
@@ -17,7 +17,7 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Play realistic synthesized sound effect for the gift
+  // Synthesize custom spatial acoustic sound for each gift
   useEffect(() => {
     if (!gift) return;
 
@@ -30,62 +30,104 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
         }
         const now = ctx.currentTime;
 
-        if (gift.animationType === 'lion_king' || gift.animationType === 'tiger') {
-          // Low-frequency roaring rumble + brass fanfare
+        const anim = gift.animationType;
+
+        if (anim === 'golden_lion' || anim === 'lion_king' || anim === 'golden_trex') {
+          // Deep rumbling roar + brass resonance
           const osc1 = ctx.createOscillator();
           const gain1 = ctx.createGain();
           osc1.type = 'sawtooth';
-          osc1.frequency.setValueAtTime(110, now);
-          osc1.frequency.exponentialRampToValueAtTime(55, now + 1.2);
-          gain1.gain.setValueAtTime(0.3, now);
-          gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+          osc1.frequency.setValueAtTime(130, now);
+          osc1.frequency.exponentialRampToValueAtTime(45, now + 1.4);
+          gain1.gain.setValueAtTime(0.35, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
           osc1.connect(gain1);
           gain1.connect(ctx.destination);
           osc1.start(now);
-          osc1.stop(now + 1.5);
-        } else if (gift.animationType === 'big_bang' || gift.animationType === 'supernova') {
-          // Cosmic sweep blast
+          osc1.stop(now + 1.8);
+        } else if (anim === 'neon_tiger' || anim === 'tiger') {
+          // Cyber lightning strike + tiger growl
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(80, now);
-          osc.frequency.exponentialRampToValueAtTime(880, now + 0.6);
-          osc.frequency.exponentialRampToValueAtTime(110, now + 2.0);
-          gain.gain.setValueAtTime(0.25, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.8);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(now);
-          osc.stop(now + 2.2);
+          osc.stop(now + 1.2);
+        } else if (anim === 'cosmic_whale') {
+          // Oceanic deep sub-bass whale song & aquatic resonance
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(120, now);
+          osc.frequency.exponentialRampToValueAtTime(320, now + 1.0);
+          osc.frequency.exponentialRampToValueAtTime(90, now + 2.5);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 2.8);
+        } else if (anim === 'golden_eagle' || anim === 'falcon') {
+          // Imperial Brass Victory Chords
+          [392.0, 523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.2, now + idx * 0.09 + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.09);
+            osc.stop(now + 2.3);
+          });
+        } else {
+          // Enigma Cosmic Warp Synthesizer
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(90, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.7);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 2.4);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 2.6);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 2.6);
         }
 
-        // Royal Fanfare chord
+        // Royal Chord Finish
         [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-
           gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(0.2, now + idx * 0.08 + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
-
+          gain.gain.linearRampToValueAtTime(0.15, now + idx * 0.08 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(now + idx * 0.08);
-          osc.stop(now + 2.6);
+          osc.stop(now + 2.9);
         });
       }
     } catch {}
 
     const timer = setTimeout(() => {
       onAnimationEnd();
-    }, 4500);
+    }, 4800);
 
     return () => clearTimeout(timer);
   }, [gift, onAnimationEnd]);
 
-  // Particle canvas animation with realistic lighting
+  // Full-Screen Holographic AR Particle Canvas Engine
   useEffect(() => {
     if (!gift || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -94,6 +136,8 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
 
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
 
     interface Particle {
       x: number;
@@ -104,59 +148,92 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
       color: string;
       alpha: number;
       decay: number;
-      shape: 'star' | 'circle' | 'diamond' | 'spark';
+      type: 'dust' | 'spark' | 'star' | 'beam';
     }
 
     const particles: Particle[] = [];
-    const colors =
-      gift.animationType === 'universe'
-        ? ['#A855F7', '#38BDF8', '#EC4899', '#FBBF24', '#FFFFFF']
-        : gift.animationType === 'lion_king'
-        ? ['#F59E0B', '#FBBF24', '#D97706', '#FFFFFF']
-        : gift.animationType === 'phoenix'
-        ? ['#EF4444', '#F97316', '#FBBF24', '#FFE4E6']
-        : ['#F59E0B', '#10B981', '#06B6D4', '#F43F5E', '#FFFFFF'];
+    const anim = gift.animationType;
 
-    for (let i = 0; i < 220; i++) {
+    // Palette per gift from Image 1
+    let palette = ['#F59E0B', '#FBBF24', '#D97706', '#FFFFFF'];
+    if (anim === 'neon_tiger') palette = ['#00D4FF', '#38BDF8', '#0284C7', '#E0F2FE', '#FFFFFF'];
+    else if (anim === 'cosmic_whale') palette = ['#0284C7', '#0EA5E9', '#38BDF8', '#818CF8', '#FFFFFF'];
+    else if (anim === 'golden_giraffe' || anim === 'golden_eagle') palette = ['#FCD34D', '#F59E0B', '#B45309', '#FEF3C7', '#FFFFFF'];
+    else if (anim === 'enigma_galaxy' || anim === 'universe') palette = ['#A855F7', '#EC4899', '#06B6D4', '#FBBF24', '#FFFFFF'];
+    else if (anim === 'golden_trex' || anim === 'golden_triceratops') palette = ['#EAB308', '#CA8A04', '#F97316', '#FEF08A', '#FFFFFF'];
+
+    for (let i = 0; i < 240; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 10 + 4;
+      const speed = Math.random() * 11 + 3;
       particles.push({
-        x: canvas.width / 2,
-        y: canvas.height / 2,
+        x: cx,
+        y: cy,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: Math.random() * 8 + 3,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        size: Math.random() * 7 + 2,
+        color: palette[Math.floor(Math.random() * palette.length)],
         alpha: 1,
-        decay: Math.random() * 0.015 + 0.006,
-        shape: Math.random() > 0.4 ? 'star' : 'spark',
+        decay: Math.random() * 0.014 + 0.007,
+        type: Math.random() > 0.5 ? 'star' : 'spark',
       });
     }
 
+    let frame = 0;
     let animationId: number;
 
     const render = () => {
+      frame++;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      particles.forEach(p => {
+      // 1. Draw 3D Hologram Projection Rings in Center
+      const ringRadius = 140 + Math.sin(frame * 0.08) * 15;
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // Rotating Outer Laser Ring
+      ctx.rotate(frame * 0.02);
+      ctx.strokeStyle = palette[0];
+      ctx.lineWidth = 2.5;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = palette[0];
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Counter-rotating Inner Hexagon Ring
+      ctx.rotate(-frame * 0.04);
+      ctx.strokeStyle = palette[1];
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      for (let s = 0; s < 6; s++) {
+        const hAngle = (s * Math.PI) / 3;
+        const hx = Math.cos(hAngle) * (ringRadius * 0.75);
+        const hy = Math.sin(hAngle) * (ringRadius * 0.75);
+        if (s === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.restore();
+
+      // 2. Render Burst Particles
+      particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.06;
+        p.vy += 0.04;
         p.alpha -= p.decay;
 
         if (p.alpha > 0) {
           ctx.save();
           ctx.globalAlpha = Math.max(0, p.alpha);
           ctx.fillStyle = p.color;
-          ctx.shadowBlur = 12;
+          ctx.shadowBlur = 10;
           ctx.shadowColor = p.color;
 
           ctx.beginPath();
-          if (p.shape === 'star') {
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          } else {
-            ctx.rect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
-          }
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -173,94 +250,70 @@ export const GiftAnimationOverlay: React.FC<GiftAnimationOverlayProps> = ({
   if (!gift) return null;
 
   return (
-    <div className="fixed inset-0 z-[999] pointer-events-none flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-300">
-      {/* Dismiss button */}
+    <div className="fixed inset-0 z-[999] pointer-events-none flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-300 select-none">
+      {/* Dismiss Button */}
       <button
         onClick={onAnimationEnd}
-        className="pointer-events-auto absolute top-5 right-5 z-20 p-2.5 rounded-full bg-black/70 hover:bg-black/90 text-white/90 hover:text-white border border-white/20 shadow-2xl transition-all"
-        title="إغلاق التأثير"
+        className="pointer-events-auto absolute top-5 right-5 z-30 p-2.5 rounded-full bg-black/75 hover:bg-black/90 text-white/90 hover:text-white border border-white/20 shadow-2xl transition-all"
+        title="إغلاق العرض"
         aria-label="Close"
       >
         <X className="w-5 h-5" />
       </button>
 
-      {/* Dynamic Particle Canvas */}
+      {/* Particle Canvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Screen flash / shockwave */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-amber-600/25 via-rose-950/20 to-black/70 animate-pulse pointer-events-none" />
+      {/* Radial Ambient Backdrop Glow */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/80 pointer-events-none" />
 
-      {/* Top Banner Announcement */}
-      <div className="relative z-10 mb-6 max-w-md mx-4 px-6 py-3 rounded-2xl bg-black/90 backdrop-blur-2xl border border-amber-400/70 shadow-[0_0_50px_rgba(245,158,11,0.6)] flex items-center gap-3 animate-bounce">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-cyan-400 p-0.5 flex items-center justify-center shrink-0 shadow-lg">
-          <div className="w-full h-full bg-black rounded-[10px] flex items-center justify-center">
-            <span className="text-xs font-black text-amber-400">{senderLevel}</span>
+      {/* Top Banner Announcement Pill */}
+      <div className="relative z-20 mb-8 max-w-md mx-4 px-5 py-3 rounded-2xl bg-black/90 backdrop-blur-2xl border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.6)] flex items-center gap-3 animate-bounce">
+        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-500 to-cyan-400 p-0.5 flex items-center justify-center shrink-0 shadow-lg">
+          <div className="w-full h-full bg-black rounded-[14px] flex items-center justify-center">
+            <span className="text-xs font-black text-amber-300">52</span>
           </div>
         </div>
 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-black text-amber-300 truncate">
-              الداعم {senderName}
-            </span>
-            <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-[9px] font-black text-white">
-              LVL {senderLevel}
+            <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-sm font-black text-white truncate">{senderName}</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-400 to-rose-600 text-[9px] font-black text-white shrink-0">
+              ENIGMA 52
             </span>
           </div>
-          <p className="text-[11px] font-bold text-white/90 truncate">
-            أطلق مجسم: {gift.nameAr}
+          <p className="text-[11px] text-amber-300 font-extrabold truncate">
+            أرسل هدية سيادية: {gift.nameAr}
           </p>
         </div>
       </div>
 
-      {/* Center 3D Realistic Holographic Model Showcase */}
-      <div className="relative z-10 flex flex-col items-center scale-100 sm:scale-120 transition-transform animate-in zoom-in-75 duration-500">
-        {/* Orbital Energy Rings */}
-        <div className="absolute -inset-10 rounded-full border-4 border-amber-400/40 animate-spin-slow" />
-        <div className="absolute -inset-16 rounded-full border-2 border-cyan-400/30" />
-        <div className="absolute -inset-6 rounded-full bg-gradient-to-tr from-amber-500/30 via-rose-600/30 to-purple-600/30 blur-3xl animate-pulse" />
+      {/* Main Holographic 3D Creature / Artifact Display Center */}
+      <div className="relative z-10 flex flex-col items-center justify-center">
+        {/* Hologram Light Cone Background */}
+        <div className="absolute -inset-16 rounded-full bg-gradient-to-tr from-amber-500/25 via-cyan-500/20 to-rose-600/25 blur-3xl animate-pulse" />
 
-        {/* 3D Realistic Model Box */}
-        <div className="relative w-40 h-40 sm:w-44 sm:h-44 rounded-3xl bg-gradient-to-tr from-black via-neutral-900 to-amber-950/90 border-2 border-amber-400 p-4 shadow-[0_0_90px_rgba(245,158,11,0.9)] flex flex-col items-center justify-center">
-          {/* Main Visual Asset / 3D Icon */}
-          <span className="text-7xl sm:text-8xl drop-shadow-[0_0_35px_rgba(255,255,255,0.9)] animate-bounce select-none">
+        {/* 3D Emote Visual Centerpiece */}
+        <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-full flex items-center justify-center border-4 border-amber-400/80 bg-black/60 backdrop-blur-md shadow-[0_0_80px_rgba(245,158,11,0.8)] animate-in zoom-in-50 duration-500">
+          {/* Animated Glowing Ring */}
+          <div className="absolute inset-0 rounded-full border-2 border-cyan-400/60 animate-spin" style={{ animationDuration: '8s' }} />
+
+          {/* Emoji / Symbol scale */}
+          <span className="text-7xl md:text-8xl select-none filter drop-shadow-[0_0_30px_rgba(255,255,255,0.9)] animate-bounce">
             {gift.emoji}
           </span>
-
-          <div className="absolute -bottom-3 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 text-black text-[10px] font-black uppercase tracking-wider shadow-lg flex items-center gap-1">
-            <Flame className="w-3 h-3 text-red-950 fill-red-950" />
-            <span>
-              {gift.animationType === 'lion_king'
-                ? 'الأسد الملكي 1:1'
-                : gift.animationType === 'universe'
-                ? 'اليونيفيرس 1:1'
-                : 'مجسم واقعي أسطوري'}
-            </span>
-          </div>
         </div>
 
-        {/* Title & Valuation */}
-        <div className="mt-6 text-center max-w-sm px-4">
-          <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-cyan-300 drop-shadow-xl">
+        {/* Gift Title & Value Banner */}
+        <div className="mt-6 text-center">
+          <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 drop-shadow-[0_2px_15px_rgba(0,0,0,0.9)]">
             {gift.nameAr}
-          </h3>
-          <p className="text-xs text-amber-100 font-bold mt-1 line-clamp-2 drop-shadow-md">
-            {gift.descriptionAr}
-          </p>
-
-          <div className="inline-flex items-center gap-2.5 mt-2.5 px-4 py-1.5 rounded-full bg-black/80 border border-amber-400/50 shadow-lg text-xs font-black tabular-nums">
-            <span className="text-amber-300 flex items-center gap-1">
-              <Gem className="w-3.5 h-3.5 text-amber-400" />
-              <span>{gift.costCoins.toLocaleString()} عملة</span>
-            </span>
-            <span className="text-neutral-500">|</span>
-            <span className="text-emerald-400">
-              ${(gift.costCoins * 0.005).toFixed(2)} USD
-            </span>
-            <span className="text-neutral-500">|</span>
-            <span className="text-cyan-300 text-[10px]">
-              المذيع: ${(gift.costCoins * 0.005 * 0.7).toFixed(2)}
+          </h2>
+          <div className="inline-flex items-center gap-2 mt-2 px-4 py-1 rounded-full bg-neutral-900/90 border border-amber-400/60 shadow-lg">
+            <Gem className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-black text-amber-300">
+              {gift.costCoins.toLocaleString()} عملة (${(gift.costCoins * 0.005).toFixed(2)} USD)
             </span>
           </div>
         </div>

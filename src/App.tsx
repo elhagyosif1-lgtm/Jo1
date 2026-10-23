@@ -17,6 +17,7 @@ import { WalletModal } from './components/WalletModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AdminBackstageModal } from './components/AdminBackstageModal';
 import { GiftModal } from './components/GiftModal';
+import { Level52Badge } from './components/Level52Badge';
 import {
   Compass,
   TrendingUp,
@@ -52,6 +53,18 @@ const AppContent: React.FC = () => {
     currentUser,
     setSearchQuery,
   } = useApp();
+
+  // Standalone Backstage Route Handling (#backstage or ?panel=backstage)
+  React.useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#backstage' || window.location.search.includes('panel=backstage')) {
+        setActiveTab('backstage');
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, [setActiveTab]);
 
   const suggestedCreators = [
     {
@@ -119,18 +132,15 @@ const AppContent: React.FC = () => {
               alt={currentUser.displayName}
               className="w-10 h-10 rounded-full object-cover ring-2 ring-amber-400"
             />
-            <span className="absolute -bottom-1 -right-1 px-1 rounded-full bg-gradient-to-r from-amber-400 to-rose-600 text-[9px] font-black text-white">
-              52
-            </span>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
               <span className="text-xs font-black text-white truncate">{currentUser.displayName}</span>
               <Crown className="w-3 h-3 text-amber-400 shrink-0" />
             </div>
-            <span className="text-[10px] text-amber-300 font-bold block truncate">
-              داعم إمبراطوري أسطوري
-            </span>
+            <div className="mt-1">
+              <Level52Badge size="sm" interactive={false} />
+            </div>
           </div>
         </div>
 
@@ -169,7 +179,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span>البث المباشر (LIVE)</span>
+            <span>بث المسابقات التفاعلي (Live Exam)</span>
           </button>
 
           <button
@@ -205,7 +215,7 @@ const AppContent: React.FC = () => {
             }`}
           >
             <LayoutDashboard className="w-4 h-4 text-amber-400" />
-            <span>الباك ستيدج (لوحة التحكم)</span>
+            <span>MR JOO Terminal (Backstage)</span>
           </button>
         </div>
 
@@ -332,16 +342,16 @@ const AppContent: React.FC = () => {
       <aside className="hidden 2xl:flex flex-col w-80 h-full border-r border-neutral-900 bg-neutral-950 p-5 select-none overflow-y-auto no-scrollbar">
         <div className="flex items-center gap-2 mb-4 text-xs font-bold text-amber-400">
           <Flame className="w-4 h-4 text-amber-500 animate-bounce" />
-          <span>منظومة هدايا (اترك أثر) - 50 هدية</span>
+          <span>منظومة الهدايا التفاعلية عالية القيمة (Tier-1 Virtual Gifts)</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-gradient-to-br from-neutral-900 to-amber-950/40 border border-amber-500/30 space-y-2 mb-5 shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-amber-300">أقوى من حركة الأسد بمراحل</span>
+            <span className="text-xs font-extrabold text-amber-300">هندسة بصرية وهولوجرامية ثلاثية الأبعاد</span>
             <Crown className="w-4 h-4 text-amber-400" />
           </div>
           <p className="text-[11px] text-neutral-300 leading-relaxed">
-            تم تطوير 50 هدية حركية واقعية وسينمائية تشمل نيزك الألماس الكوني، طائر الفينيق الناري، وسوبرنوفا المجرات مع اهتزاز الشاشة ومؤثرات صوتية أوركسترالية!
+            منظومة متقدمة تضم 50 مجسماً هولوجرامياً تشمل الأسد الذهبي المتوهج، النمر النيوني الأزرق، حوت المحيط الكوني، ومجرة الأنيجما الكونية بمؤثرات صوتية أوركسترالية متزامنة!
           </p>
         </div>
 

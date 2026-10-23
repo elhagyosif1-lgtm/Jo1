@@ -35,14 +35,6 @@ export const TopHeader: React.FC = () => {
         >
           {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-white" />}
         </button>
-
-        <button
-          onClick={() => setActiveTab('backstage')}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-600/20 border border-amber-400/40 text-amber-300 text-xs font-bold hover:bg-black/60 active:scale-95 transition-transform shadow-md"
-          title="لوحة تحكم المنصة (الباك ستيدج)"
-        >
-          <span className="font-black text-[10px]">الباك ستيدج</span>
-        </button>
       </div>
 
       {/* Middle zone: Feed Type Tabs (Following | For You) */}

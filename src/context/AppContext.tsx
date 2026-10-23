@@ -11,10 +11,12 @@ import {
   VideoPrivacy,
   GiftItem,
   UserWallet,
-  WalletTransaction
+  WalletTransaction,
+  VerificationRequest
 } from '../types';
 import { INITIAL_VIDEOS, INITIAL_COMMENTS, TRENDING_SOUNDS } from '../data/initialVideos';
 import { sendGiftRpc } from '../services/supabaseService';
+import { MR_JOO_FOUNDER_AVATAR } from '../assets/mrJooAssets';
 
 interface AppContextType {
   videos: VideoItem[];
@@ -80,6 +82,12 @@ interface AppContextType {
   autoAdvanceVideos: boolean;
   setAutoAdvanceVideos: (enable: boolean) => void;
   directVideoIdParam: string | null;
+  verificationRequests: VerificationRequest[];
+  submitVerificationRequest: (req: Omit<VerificationRequest, 'id' | 'submittedAt' | 'status'>) => void;
+  approveVerificationRequest: (requestId: string) => void;
+  rejectVerificationRequest: (requestId: string, note?: string) => void;
+  isVerificationModalOpen: boolean;
+  setIsVerificationModalOpen: (open: boolean) => void;
   t: (key: string) => string;
 }
 
@@ -92,25 +100,102 @@ const LOCAL_STORAGE_FOLLOWS_KEY = 'jo1_user_follows_v3';
 const LOCAL_STORAGE_INTERESTS_KEY = 'jo1_user_interests_v3';
 const LOCAL_STORAGE_WALLET_KEY = 'jo1_user_wallet_v3';
 const LOCAL_STORAGE_AUTO_ADVANCE_KEY = 'jo1_auto_advance_videos';
+const LOCAL_STORAGE_VERIFICATIONS_KEY = 'jo1_verification_requests_v1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current user with Level 52 Top Supporter Badge
+  // Current user: MR JOO — Founder & CEO with ENIGMA Level 52 Imperial Supporter Crest
   const [currentUser, setCurrentUser] = useState<Creator>(() => {
     return {
       id: 'current-user-1',
-      username: 'youssef_official',
-      displayName: 'يوسف الحج 🌟',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+      username: 'mr_joo_official',
+      displayName: 'MR JOO 👑',
+      avatarUrl: MR_JOO_FOUNDER_AVATAR,
       isVerified: true,
-      bio: 'مبتكر ومؤسس منصة Jo1 | أعلى داعم إمبراطوري ليفيل 52 👑💎',
-      followersCount: 184500,
-      followingCount: 240,
-      totalLikes: '3.4M',
+      bio: 'المؤسس والمدير التنفيذي لمنصة Jo1 | أعلى داعم إمبراطوري ENIGMA Level 52 👑💎',
+      followersCount: 245000,
+      followingCount: 150,
+      totalLikes: '4.8M',
       supporterLevel: 52,
-      supporterTitle: 'داعم إمبراطوري أسطوري (Level 52)',
+      supporterTitle: 'داعم إمبراطوري أسطوري (ENIGMA Level 52)',
       vodafoneCashMasked: '010*****514',
     };
   });
+
+  // Enterprise Broadcaster Verification State (Paid 200 EGP Program)
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_VERIFICATIONS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 'ver-req-1',
+        creatorId: 'creator-4',
+        creatorName: 'كريم أحمد',
+        creatorUsername: 'tech_kareem',
+        creatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+        feeEgp: 200,
+        feeCoins: 4000,
+        status: 'pending',
+        channelUrl: 'https://mrjo1.vercel.app/@tech_kareem',
+        category: 'Tech Media & AI',
+        nationalIdMasked: '298********512',
+        submittedAt: 'اليوم، 11:30 ص',
+      },
+      {
+        id: 'ver-req-2',
+        creatorId: 'creator-2',
+        creatorName: 'سارة خالد',
+        creatorUsername: 'sara_adventures',
+        creatorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+        feeEgp: 200,
+        feeCoins: 4000,
+        status: 'pending',
+        channelUrl: 'https://mrjo1.vercel.app/@sara_adventures',
+        category: 'Travel & Adventures',
+        nationalIdMasked: '295********920',
+        submittedAt: 'أمس، 08:15 م',
+      },
+    ];
+  });
+
+  const submitVerificationRequest = (reqData: Omit<VerificationRequest, 'id' | 'submittedAt' | 'status'>) => {
+    const newReq: VerificationRequest = {
+      ...reqData,
+      id: `ver-req-${Date.now()}`,
+      status: 'pending',
+      submittedAt: 'الآن',
+    };
+
+    setVerificationRequests(prev => {
+      const updated = [newReq, ...prev];
+      try {
+        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const approveVerificationRequest = (requestId: string) => {
+    setVerificationRequests(prev => {
+      const updated = prev.map(r => (r.id === requestId ? { ...r, status: 'approved' as const, reviewedAt: 'الآن' } : r));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const rejectVerificationRequest = (requestId: string, note?: string) => {
+    setVerificationRequests(prev => {
+      const updated = prev.map(r => (r.id === requestId ? { ...r, status: 'rejected' as const, reviewNote: note, reviewedAt: 'الآن' } : r));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
 
   const [userInterests, setUserInterestsState] = useState<VideoCategory[]>(() => {
     try {
@@ -876,6 +961,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         autoAdvanceVideos,
         setAutoAdvanceVideos,
         directVideoIdParam,
+        verificationRequests,
+        submitVerificationRequest,
+        approveVerificationRequest,
+        rejectVerificationRequest,
+        isVerificationModalOpen,
+        setIsVerificationModalOpen,
         t,
       }}
     >

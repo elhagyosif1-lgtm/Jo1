@@ -18,8 +18,11 @@ import {
   Lock,
   Copy,
   CheckCircle2,
-  Send
+  Send,
+  Terminal
 } from 'lucide-react';
+import { Level52Badge } from './Level52Badge';
+import { VerificationModal } from './VerificationModal';
 
 export const ProfileView: React.FC = () => {
   const {
@@ -39,6 +42,7 @@ export const ProfileView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'private' | 'my' | 'liked' | 'saved'>('private');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
   const [displayName, setDisplayName] = useState(currentUser.displayName);
   const [bio, setBio] = useState(currentUser.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl);
@@ -126,21 +130,23 @@ export const ProfileView: React.FC = () => {
           </div>
 
           {/* LEVEL 52 ICONIC SUPPORTER BADGE */}
-          <div className="absolute -bottom-2 inset-x-0 flex justify-center">
-            <div className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 via-rose-600 to-cyan-400 text-white flex items-center gap-1 shadow-[0_0_15px_rgba(245,158,11,0.9)] border border-white">
-              <Crown className="w-3 h-3 text-amber-300 fill-amber-300 animate-bounce" />
-              <span className="text-[11px] font-black tracking-wider tabular-nums">52</span>
-              <Flame className="w-3 h-3 text-amber-300 fill-amber-300" />
-            </div>
+          <div className="absolute -bottom-3 inset-x-0 flex justify-center">
+            <Level52Badge size="sm" interactive={true} />
           </div>
         </div>
 
-        {/* Display Name & Verified */}
-        <div className="flex items-center gap-1.5 mt-2">
+        {/* Display Name & Official Verified Shield */}
+        <div className="flex items-center gap-1.5 mt-3">
           <h2 className="text-xl font-extrabold text-white">{currentUser.displayName}</h2>
-          <span className="w-5 h-5 rounded-full bg-cyan-400 text-black flex items-center justify-center text-xs font-black shadow-md">
-            ✓
-          </span>
+          {currentUser.isVerified && (
+            <span
+              className="px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-[10px] font-black flex items-center gap-1 shadow-[0_0_12px_rgba(6,182,212,0.8)] border border-cyan-300"
+              title="موثق رسمياً برتبة الشريك المؤسسي المعتمد"
+            >
+              <ShieldCheck className="w-3 h-3 text-white" />
+              <span>موثق معتمد</span>
+            </span>
+          )}
         </div>
         <p className="text-xs text-neutral-400 font-semibold mb-2">@{currentUser.username}</p>
 
@@ -151,7 +157,7 @@ export const ProfileView: React.FC = () => {
         >
           <Gem className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
           <span className="text-xs font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-cyan-300">
-            داعم إمبراطوري أسطوري (Level 52)
+            داعم إمبراطوري أسطوري (ENIGMA Level 52)
           </span>
         </div>
 
@@ -199,11 +205,11 @@ export const ProfileView: React.FC = () => {
           </p>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 mt-1">
+        {/* Action Buttons Row 1 */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
           <button
             onClick={() => setShowEditModal(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold border border-neutral-700 active:scale-95 transition-all shadow-md"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold border border-neutral-700 active:scale-95 transition-all shadow-md"
           >
             <Edit3 className="w-3.5 h-3.5" />
             <span>{t('editProfile')}</span>
@@ -211,10 +217,28 @@ export const ProfileView: React.FC = () => {
 
           <button
             onClick={() => setIsWalletModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black text-xs font-black active:scale-95 transition-all shadow-md"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black text-xs font-black active:scale-95 transition-all shadow-md"
           >
             <Wallet className="w-3.5 h-3.5" />
-            <span>شحن وسحب الأرباح</span>
+            <span>المحفظة والتحويلات</span>
+          </button>
+
+          {/* Paid Verification 200 EGP CTA */}
+          <button
+            onClick={() => setIsVerificationOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white text-xs font-bold active:scale-95 transition-all shadow-md"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>طلب توثيق (200 ج.م)</span>
+          </button>
+
+          {/* Sovereign Founder Terminal Entry */}
+          <button
+            onClick={() => setActiveTab('backstage')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#090e1a] hover:bg-[#0f172a] border border-amber-400/50 text-amber-300 text-xs font-mono font-bold active:scale-95 transition-all shadow-md"
+          >
+            <Terminal className="w-3.5 h-3.5 text-amber-400" />
+            <span>MR JOO Terminal</span>
           </button>
         </div>
       </div>
@@ -529,6 +553,12 @@ export const ProfileView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Enterprise Verification Modal */}
+      <VerificationModal
+        isOpen={isVerificationOpen}
+        onClose={() => setIsVerificationOpen(false)}
+      />
     </div>
   );
 };

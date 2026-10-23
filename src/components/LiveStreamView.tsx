@@ -12,15 +12,24 @@ import {
   Tv,
   Coins,
   Flame,
-  ChevronDown
+  Crown,
+  Heart,
+  HelpCircle,
+  Shuffle,
+  Eye,
+  CheckCircle2,
+  Trophy,
+  Zap,
+  Globe
 } from 'lucide-react';
+import { Level52Badge } from './Level52Badge';
 
-interface LiveMessage {
-  id: string;
-  user: string;
+interface LiveSupporter {
+  rank: number;
+  name: string;
   avatar: string;
-  text: string;
-  isGift?: boolean;
+  score: string;
+  level?: number;
 }
 
 export const LiveStreamView: React.FC = () => {
@@ -28,342 +37,475 @@ export const LiveStreamView: React.FC = () => {
     setActiveTab,
     triggerGiftAnimation,
     wallet,
-    setIsWalletModalOpen,
+    depositCoins,
     currentUser,
   } = useApp();
 
-  const [messages, setMessages] = useState<LiveMessage[]>([
-    {
-      id: 'm1',
-      user: 'سارة خالد',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      text: 'منور البث يا بطل! 🚀',
-    },
-    {
-      id: 'm2',
-      user: 'أحمد التميمي',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      text: 'ما شاء الله البث عالي الدقة جداً 👏',
-    },
+  // Active view tab on mobile: 'exam' | 'chat' | 'leaderboards'
+  const [mobileSubTab, setMobileSubTab] = useState<'exam' | 'chat' | 'leaderboards'>('exam');
+
+  // Exam Question State (Image 4: "ما هي عاصمة فرنسا؟" -> باريس)
+  const [question, setQuestion] = useState({
+    id: 1,
+    number: '001 / 500',
+    title: 'ما هي عاصمة فرنسا؟',
+    answer: 'باريس',
+    letters: ['ب', 'ا', 'ر', 'ي', 'س'],
+  });
+
+  const [revealedIndices, setRevealedIndices] = useState<number[]>([0]); // 'ب' revealed initially
+  const [solved, setSolved] = useState(false);
+  const [coinsPool, setCoinsPool] = useState(1250);
+
+  // Chat stream
+  const [chatMessages, setChatMessages] = useState<
+    Array<{ id: string; user: string; text: string; isCorrect?: boolean; badge?: string }>
+  >([
+    { id: '1', user: 'Ahmed', text: 'باريس', isCorrect: true, badge: '👑' },
+    { id: '2', user: 'Sara', text: 'فرنسا ❤️' },
+    { id: '3', user: 'Zizo', text: 'باريس ياعم 🔥' },
+    { id: '4', user: 'Lolo', text: '❤️❤️' },
+    { id: '5', user: 'M7md', text: 'باريس صح' },
+    { id: '6', user: 'Queen', text: 'صح Queen 👑' },
+    { id: '7', user: 'Roro', text: 'باريس' },
+    { id: '8', user: 'Nour', text: 'وهي فرنسا كمان 💖' },
+    { id: '9', user: 'Fares', text: 'باريس 🔥' },
+    { id: '10', user: 'Dodo', text: 'عندك 100 عملة؟' },
   ]);
 
-  const [inputVal, setInputVal] = useState('');
-  const [viewerCount, setViewerCount] = useState(18920);
-  const [showGiftTray, setShowGiftTray] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<string>('impact');
-  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [spotlightUser, setSpotlightUser] = useState({
+    name: 'Ahmed',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    text: 'أجاب بشكل صحيح +200 🟡',
+  });
 
-  useEffect(() => {
-    const sampleUsers = [
-      { name: 'محمد المصري', msg: 'أهلاً بالجميع في Jo1 Live 🚀' },
-      { name: 'هدى كريم', msg: 'الصوت والصورة روعة! 💯' },
-      { name: 'فهد الشمري', msg: 'أقوى بث اليوم 🔥' },
-      { name: 'ليان', msg: 'أرسلت هدية أثر أسطوري 💎' },
-      { name: 'طارق', msg: 'البث مشفر وسريع جداً' },
-    ];
+  // Top Supporters from Image 4
+  const topSupporters: LiveSupporter[] = [
+    { rank: 1, name: 'Queen', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', score: '12.4K', level: 50 },
+    { rank: 2, name: 'Ahmed', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', score: '8.7K', level: 48 },
+    { rank: 3, name: 'Lolo', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', score: '6.3K', level: 45 },
+    { rank: 4, name: 'Roro', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', score: '5.1K', level: 42 },
+    { rank: 5, name: 'M7md', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', score: '4.8K', level: 40 },
+  ];
 
-    const interval = setInterval(() => {
-      const random = sampleUsers[Math.floor(Math.random() * sampleUsers.length)];
-      setMessages(prev => [
-        ...prev.slice(-30),
-        {
-          id: `m-${Date.now()}`,
-          user: random.name,
-          avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
-          text: random.msg,
-        },
-      ]);
-      setViewerCount(c => c + Math.floor(Math.random() * 7) - 3);
-    }, 2500);
+  // Top Likers
+  const topLikers = [
+    { rank: 1, name: 'Sama', score: '78.2K' },
+    { rank: 2, name: 'Zizo', score: '62.7K' },
+    { rank: 3, name: 'Nour', score: '51.3K' },
+    { rank: 4, name: 'ahmed_22', score: '43.9K' },
+    { rank: 5, name: 'Layan', score: '38.6K' },
+  ];
 
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  // Hint: Reveal Letter (50 coins)
+  const handleRevealLetter = () => {
+    const unrevealed = [0, 1, 2, 3, 4].filter((idx) => !revealedIndices.includes(idx));
+    if (unrevealed.length > 0) {
+      const nextIdx = unrevealed[0];
+      const updated = [...revealedIndices, nextIdx];
+      setRevealedIndices(updated);
+      setCoinsPool((c) => Math.max(0, c - 50));
+      if (updated.length === 5) {
+        setSolved(true);
+      }
     }
-  }, [messages]);
+  };
 
+  // Hint: Ask a friend (100 coins)
+  const handleAskFriend = () => {
+    setRevealedIndices([0, 1, 2, 3, 4]);
+    setSolved(true);
+    setCoinsPool((c) => Math.max(0, c - 100));
+  };
+
+  // Submit Answer from Comments
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    if (!chatInput.trim()) return;
 
-    setMessages(prev => [
+    const text = chatInput.trim();
+    const isCorrect = text.includes('باريس') || text.toLowerCase().includes('paris');
+
+    setChatMessages((prev) => [
       ...prev,
       {
-        id: `m-${Date.now()}`,
-        user: 'أنت (الداعم 52)',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-        text: inputVal.trim(),
+        id: Date.now().toString(),
+        user: currentUser.displayName,
+        text,
+        isCorrect,
+        badge: '👑',
       },
     ]);
-    setInputVal('');
-  };
 
-  const handleFireGift = (gift: GiftItem) => {
-    const success = triggerGiftAnimation(gift);
-    if (!success) {
-      alert(`رصيدك المتاح (${wallet.coinsBalance.toLocaleString()} عملة) لا يكفي لإرسال ${gift.nameAr}. اضغط على المحفظة لشحن الرصيد.`);
-      setIsWalletModalOpen(true);
-      return;
-    }
-    setMessages(prev => [
-      ...prev,
-      {
-        id: `gift-${Date.now()}`,
-        user: `${currentUser.displayName} [LVL ${currentUser.supporterLevel || 52}]`,
+    if (isCorrect) {
+      setRevealedIndices([0, 1, 2, 3, 4]);
+      setSolved(true);
+      setSpotlightUser({
+        name: currentUser.displayName,
         avatar: currentUser.avatarUrl,
-        text: `أطلق هدية أثر: ${gift.nameAr} (${gift.costCoins.toLocaleString()} عملة)! 💥`,
-        isGift: true,
-      },
-    ]);
-    setShowGiftTray(false);
-  };
+        text: 'أجاب بشكل صحيح +200 🟡',
+      });
+      depositCoins(200, 1.0, 'مكافأة الفوز في مسابقة MR JOO LIVE EXAM');
+    }
 
-  const displayedGifts =
-    selectedTier === 'all'
-      ? IMPACT_GIFTS_50
-      : IMPACT_GIFTS_50.filter(g => g.tier === selectedTier);
+    setChatInput('');
+  };
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden select-none">
-      {/* Background Live Stream Video */}
-      <video
-        src="https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-fashion-model-in-the-city-43285-large.mp4"
-        playsInline
-        loop
-        autoPlay
-        muted
-        className="w-full h-full object-cover"
-      />
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 pointer-events-none" />
-
-      {/* Top Live Bar */}
-      <div className="absolute top-0 inset-x-0 pt-safe px-4 py-3 z-30 flex items-center justify-between">
-        <div className="flex items-center gap-2 p-1 pl-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
-          <img
-            src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&auto=format&fit=crop&q=80"
-            alt="Streamer"
-            className="w-8 h-8 rounded-full object-cover"
-          />
-          <div>
-            <p className="text-xs font-bold text-white">ليلى فاشن لايف 🔴</p>
-            <p className="text-[10px] text-neutral-400">Jo1 LIVE Host</p>
-          </div>
-          <button className="px-3 py-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold mr-1 active:scale-95 transition-transform">
-            متابعة
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Switch to OBS Studio Mode Button */}
-          <button
-            onClick={() => setActiveTab('obs_studio')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-cyan-300 text-xs font-extrabold hover:bg-cyan-900 active:scale-95 transition-all shadow-md"
-            title="فتح لوحة تحكم OBS Studio"
-          >
-            <Tv className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">ستوديو OBS</span>
-          </button>
-
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-600/90 text-white text-xs font-extrabold shadow-lg">
-            <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span>LIVE</span>
-          </div>
-
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-bold border border-white/10">
-            <Users className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="tabular-nums">{viewerCount.toLocaleString()}</span>
-          </div>
-
+    <div className="relative w-full h-full bg-[#050714] text-white flex flex-col select-none overflow-hidden font-sans">
+      {/* Top Header Bar (Matching Image 4: MR JOO LIVE EXAM) */}
+      <header className="h-16 px-4 border-b border-cyan-900/40 bg-gradient-to-r from-[#090d24] via-[#0d143a] to-[#090d24] flex items-center justify-between shrink-0 shadow-lg">
+        {/* Left Creator Info */}
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setActiveTab('feed')}
-            className="p-1.5 rounded-full bg-black/50 text-white hover:bg-black/80 border border-white/10"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
-        </div>
-      </div>
 
-      {/* Chat Messages Stream */}
-      <div className="absolute bottom-28 left-4 right-16 z-20 max-w-sm">
-        <div
-          ref={chatScrollRef}
-          className="h-56 overflow-y-auto no-scrollbar space-y-2 flex flex-col justify-end"
-        >
-          {messages.map(m => (
-            <div
-              key={m.id}
-              className={`flex items-start gap-2 p-2 rounded-xl backdrop-blur-md max-w-fit ${
-                m.isGift
-                  ? 'bg-gradient-to-r from-amber-600/90 to-rose-600/90 text-white border border-amber-300/40 shadow-lg'
-                  : 'bg-black/50 text-white/90 border border-white/10'
-              }`}
-            >
-              <img
-                src={m.avatar}
-                alt={m.user}
-                className="w-5 h-5 rounded-full object-cover shrink-0 mt-0.5"
-              />
-              <div className="text-xs">
-                <span className="font-extrabold text-cyan-300 ml-1.5">{m.user}:</span>
-                <span className="font-medium">{m.text}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Floating Action Rail: Quick Gift Button */}
-      <div className="absolute right-3 bottom-28 z-20 flex flex-col items-center gap-3">
-        <button
-          onClick={() => setShowGiftTray(!showGiftTray)}
-          className="p-3 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-cyan-400 text-white shadow-[0_0_25px_rgba(245,158,11,0.6)] active:scale-95 transition-all animate-bounce"
-          title="افتح قائمة 50 هدية (اترك أثر)"
-        >
-          <Gift className="w-6 h-6 stroke-[2.5]" />
-        </button>
-
-        <button
-          onClick={() => setIsWalletModalOpen(true)}
-          className="flex flex-col items-center p-2 rounded-2xl bg-black/60 backdrop-blur-md border border-amber-400/40 text-amber-300 hover:scale-105 active:scale-95 transition-all shadow-md"
-          title="شحن محفظة Jo1"
-        >
-          <Coins className="w-4 h-4 text-amber-400" />
-          <span className="text-[9px] font-black tabular-nums mt-0.5">
-            {(wallet.coinsBalance / 1000).toFixed(0)}K
-          </span>
-        </button>
-      </div>
-
-      {/* 50 Gifts Bottom Sheet (اترك أثر) */}
-      {showGiftTray && (
-        <div className="absolute bottom-0 inset-x-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-t border-amber-500/30 rounded-t-3xl p-4 flex flex-col max-h-[65vh] shadow-2xl animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="font-black text-sm text-white">هدايا (اترك أثر) الأسطورية - 50 هدية</h3>
-                <p className="text-[10px] text-amber-300">تأثيرات حركية خرافية تتجاوز الأسد بكثير</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowGiftTray(false)}
-              className="p-1 rounded-full text-neutral-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="relative">
+            <img
+              src={currentUser.avatarUrl}
+              alt={currentUser.displayName}
+              className="w-10 h-10 rounded-full object-cover ring-2 ring-cyan-400"
+            />
+            <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-[9px] font-black text-white flex items-center gap-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              LIVE
+            </span>
           </div>
 
-          {/* Tier Tabs */}
-          <div className="flex items-center gap-1.5 py-2 overflow-x-auto no-scrollbar text-xs font-bold">
-            <button
-              onClick={() => setSelectedTier('impact')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all ${
-                selectedTier === 'impact'
-                  ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-black font-black shadow-md'
-                  : 'bg-neutral-900 text-neutral-400'
-              }`}
-            >
-              💥 اترك أثر (تتجاوز الأسد)
-            </button>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-xs font-black text-white tracking-wide">MR JOO</h2>
+              <span className="w-3.5 h-3.5 rounded-full bg-cyan-400 text-black flex items-center justify-center text-[9px] font-black">
+                ✓
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-neutral-400">
+              <span className="text-amber-400 flex items-center gap-0.5">
+                <Crown className="w-3 h-3 text-amber-400" /> مباشر الآن
+              </span>
+              <span>•</span>
+              <span className="text-neutral-300">500 سؤال | لعبة تفاعلية</span>
+            </div>
+          </div>
+        </div>
 
-            <button
-              onClick={() => setSelectedTier('legendary')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all ${
-                selectedTier === 'legendary'
-                  ? 'bg-amber-600 text-white font-bold'
-                  : 'bg-neutral-900 text-neutral-400'
-              }`}
-            >
-              👑 أسطوري
-            </button>
+        {/* Center Title Logo Lockup */}
+        <div className="hidden sm:flex flex-col items-center">
+          <div className="flex items-center gap-1.5">
+            <Crown className="w-4 h-4 text-amber-400 animate-bounce" />
+            <span className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-400 to-cyan-300">
+              MR JOO LIVE EXAM
+            </span>
+            <Crown className="w-4 h-4 text-amber-400 animate-bounce" />
+          </div>
+          <span className="text-[10px] text-neutral-400">جاوب .. أكسب .. كن الأفضل 👑</span>
+        </div>
 
-            <button
-              onClick={() => setSelectedTier('royal')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all ${
-                selectedTier === 'royal'
-                  ? 'bg-rose-600 text-white font-bold'
-                  : 'bg-neutral-900 text-neutral-400'
-              }`}
-            >
-              💎 ملكي
-            </button>
-
-            <button
-              onClick={() => setSelectedTier('all')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all ${
-                selectedTier === 'all'
-                  ? 'bg-neutral-800 text-white'
-                  : 'bg-neutral-900 text-neutral-400'
-              }`}
-            >
-              جميع الـ 50 هدية
-            </button>
+        {/* Right Status */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600/20 border border-rose-500/40 text-rose-300 text-xs font-mono font-bold">
+            <Users className="w-3.5 h-3.5 text-rose-400" />
+            <span>2.4K</span>
           </div>
 
-          {/* 50 Gifts Grid */}
-          <div className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-4 sm:grid-cols-5 gap-2 py-2">
-            {displayedGifts.map(g => (
+          <Level52Badge size="sm" interactive={true} />
+        </div>
+      </header>
+
+      {/* Mobile Sub-Navigation Tabs */}
+      <div className="sm:hidden flex border-b border-neutral-800 bg-[#070b1a] shrink-0 text-xs font-bold">
+        <button
+          onClick={() => setMobileSubTab('exam')}
+          className={`flex-1 py-2 text-center transition-colors ${
+            mobileSubTab === 'exam'
+              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
+              : 'text-neutral-400'
+          }`}
+        >
+          السؤال الحالي (Exam)
+        </button>
+        <button
+          onClick={() => setMobileSubTab('chat')}
+          className={`flex-1 py-2 text-center transition-colors ${
+            mobileSubTab === 'chat'
+              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
+              : 'text-neutral-400'
+          }`}
+        >
+          شات البث (Live Chat)
+        </button>
+        <button
+          onClick={() => setMobileSubTab('leaderboards')}
+          className={`flex-1 py-2 text-center transition-colors ${
+            mobileSubTab === 'leaderboards'
+              ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
+              : 'text-neutral-400'
+          }`}
+        >
+          الترتيب والداعمين
+        </button>
+      </div>
+
+      {/* Main Grid Viewport (Matching Image 4) */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT COLUMN: TOP SUPPORTERS & LIKERS (Desktop + Mobile Tab) */}
+        <aside
+          className={`w-full sm:w-64 border-l border-cyan-900/30 bg-[#070a1c] p-3 overflow-y-auto no-scrollbar space-y-4 shrink-0 ${
+            mobileSubTab === 'leaderboards' ? 'block' : 'hidden sm:block'
+          }`}
+        >
+          {/* Top Supporters */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-400">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>Top Supporters</span>
+            </div>
+            <div className="space-y-1.5">
+              {topSupporters.map((s) => (
+                <div
+                  key={s.rank}
+                  className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/60 border border-neutral-800 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-amber-400 w-4">{s.rank}</span>
+                    <img src={s.avatar} alt={s.name} className="w-6 h-6 rounded-full object-cover" />
+                    <span className="font-bold text-white truncate max-w-[80px]">{s.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-mono text-[11px] text-amber-300">
+                    <Gift className="w-3 h-3 text-rose-400" />
+                    <span>{s.score}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Likers */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-rose-400">
+              <Heart className="w-4 h-4 text-rose-400 fill-rose-500" />
+              <span>Top Likers</span>
+            </div>
+            <div className="space-y-1.5">
+              {topLikers.map((l) => (
+                <div
+                  key={l.rank}
+                  className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/60 border border-neutral-800 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-rose-400 w-4">{l.rank}</span>
+                    <span className="font-bold text-white truncate max-w-[90px]">{l.name}</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-rose-300">{l.score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* CENTER COLUMN: INTERACTIVE QUESTION ARENA (Image 4) */}
+        <main
+          className={`flex-1 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto no-scrollbar bg-gradient-to-b from-[#060919] via-[#090d24] to-[#040612] ${
+            mobileSubTab === 'exam' ? 'flex' : 'hidden sm:flex'
+          }`}
+        >
+          {/* Question Card Box */}
+          <div className="w-full max-w-lg mx-auto rounded-3xl bg-gradient-to-b from-[#0e1635] to-[#090d24] border-2 border-cyan-500/50 p-6 shadow-[0_0_50px_rgba(6,182,212,0.25)] text-center relative overflow-hidden">
+            {/* Top Question Info */}
+            <div className="flex items-center justify-between text-xs font-mono font-bold mb-4">
+              <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                السؤال الحالي ❓
+              </span>
+              <span className="text-neutral-400">{question.number}</span>
+            </div>
+
+            {/* Glowing Center Brain Icon */}
+            <div className="w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-400/40 mx-auto mb-4 flex items-center justify-center text-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.4)] animate-pulse">
+              <Zap className="w-8 h-8" />
+            </div>
+
+            {/* Question Text */}
+            <h3 className="text-2xl sm:text-3xl font-black text-white tracking-wide mb-6">
+              {question.title}
+            </h3>
+
+            <p className="text-xs text-neutral-400 mb-4">
+              اختر الإجابة الصحيحة من الحروف المخفية أو اكتبها في التعليقات
+            </p>
+
+            {/* Letter Slots Array: [ ب ] [ ا ] [ ر ] [ ي ] [ س ] */}
+            <div className="flex items-center justify-center gap-2.5 mb-8">
+              {question.letters.map((letter, idx) => {
+                const isRevealed = revealedIndices.includes(idx);
+                return (
+                  <div
+                    key={idx}
+                    className={`w-12 h-14 sm:w-14 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-black transition-all duration-300 border-2 ${
+                      isRevealed
+                        ? 'bg-gradient-to-b from-cyan-500 to-blue-700 text-white border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.7)] scale-105'
+                        : 'bg-[#0b1026] text-neutral-500 border-cyan-900/60'
+                    }`}
+                  >
+                    {isRevealed ? letter : '_'}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Solved Banner */}
+            {solved && (
+              <div className="mb-6 p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-300 text-sm font-bold flex items-center justify-center gap-2 animate-in zoom-in">
+                <CheckCircle2 className="w-5 h-5" />
+                <span>مبروك! تم حل السؤال بنجاح والإجابة هي (باريس) 🎉</span>
+              </div>
+            )}
+
+            {/* Action Buttons Row (Image 4: مساعدة صديق | فتح حرف | إعادة المزيج) */}
+            <div className="grid grid-cols-3 gap-2.5 text-xs font-bold">
               <button
-                key={g.id}
-                onClick={() => handleFireGift(g)}
-                className="group flex flex-col items-center p-2 rounded-2xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-400/80 active:scale-95 transition-all shadow-md text-center"
+                onClick={handleAskFriend}
+                className="py-3 px-2 rounded-xl bg-purple-900/70 hover:bg-purple-800 border border-purple-500/50 text-purple-200 flex flex-col items-center gap-1 active:scale-95 transition-all"
               >
-                <span className="text-3xl mb-1 group-hover:scale-125 transition-transform">
-                  {g.emoji}
-                </span>
-                <span className="text-[10px] font-bold text-white line-clamp-1">
-                  {g.nameAr}
-                </span>
-                <span className="text-[9px] font-black text-amber-300 tabular-nums">
-                  {g.costCoins.toLocaleString()} عملة
-                </span>
+                <div className="flex items-center gap-1 font-mono text-amber-300">
+                  <span>100</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                </div>
+                <span>مساعدة صديق ❓</span>
               </button>
+
+              <button
+                onClick={handleRevealLetter}
+                className="py-3 px-2 rounded-xl bg-blue-900/70 hover:bg-blue-800 border border-blue-500/50 text-blue-200 flex flex-col items-center gap-1 active:scale-95 transition-all"
+              >
+                <div className="flex items-center gap-1 font-mono text-amber-300">
+                  <span>50</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                </div>
+                <span>فتح حرف 👁️</span>
+              </button>
+
+              <button
+                onClick={() => setRevealedIndices([0])}
+                className="py-3 px-2 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 flex flex-col items-center gap-1 active:scale-95 transition-all"
+              >
+                <div className="flex items-center gap-1 font-mono text-amber-300">
+                  <span>25</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                </div>
+                <span>إعادة المزيج 🔄</span>
+              </button>
+            </div>
+
+            <div className="mt-4 text-[11px] text-cyan-400 font-bold">
+              الإجابة عن طريق التعليقات &gt;&gt;
+            </div>
+          </div>
+
+          {/* Bottom Banner: Connected to TikTok LIVE (Image 4) */}
+          <div className="w-full max-w-lg mx-auto mt-4 p-4 rounded-2xl bg-gradient-to-r from-[#0c1333] to-[#070b1f] border border-cyan-500/40 flex items-center justify-between gap-3 shadow-lg">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white">MR JOO CLOUD LIVE</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-bold border border-emerald-500/40">
+                  ✓ متصل
+                </span>
+              </div>
+              <p className="text-[10px] text-neutral-400 truncate">
+                تفاعل لحظي • ألعاب تفاعلية • جوائز ومفاجآت
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                const targetGift = IMPACT_GIFTS_50[0];
+                triggerGiftAnimation(targetGift);
+              }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-cyan-500 text-white font-black text-xs shadow-md shrink-0 active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              <span>ابدأ البث الآن</span>
+            </button>
+          </div>
+        </main>
+
+        {/* RIGHT COLUMN: LIVE CHAT & SPOTLIGHT (Image 4) */}
+        <aside
+          className={`w-full sm:w-72 border-r border-cyan-900/30 bg-[#070a1c] flex flex-col justify-between shrink-0 ${
+            mobileSubTab === 'chat' ? 'flex' : 'hidden sm:flex'
+          }`}
+        >
+          {/* Chat Header */}
+          <div className="p-3 border-b border-neutral-800 flex items-center justify-between text-xs font-bold text-white">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Live Chat</span>
+            </span>
+            <span className="text-neutral-400 font-mono text-[10px]">2.4K online</span>
+          </div>
+
+          {/* Chat Stream Messages */}
+          <div className="flex-1 p-3 overflow-y-auto space-y-2 no-scrollbar text-xs">
+            {chatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`p-2 rounded-xl transition-all ${
+                  msg.isCorrect
+                    ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-300'
+                    : 'bg-neutral-900/60 border border-neutral-800/80 text-white'
+                }`}
+              >
+                <div className="flex items-center gap-1 font-bold text-[11px] mb-0.5">
+                  <span className="text-cyan-400">{msg.user}</span>
+                  {msg.badge && <span>{msg.badge}</span>}
+                </div>
+                <p className="text-neutral-200">{msg.text}</p>
+              </div>
             ))}
           </div>
 
-          {/* Footer with Wallet Info & Recharge button */}
-          <div className="pt-2 border-t border-neutral-800 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-neutral-300">
-              <Coins className="w-4 h-4 text-amber-400" />
-              <span>رصيدك: <b className="text-amber-400 font-bold tabular-nums">{wallet.coinsBalance.toLocaleString()}</b> عملة</span>
+          {/* Spotlight Card (Image 4: Ahmed أجاب بشكل صحيح +200 🟡) */}
+          <div className="p-3 border-t border-neutral-800 bg-[#090e24]">
+            <div className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-neutral-900 to-transparent border border-amber-400/40 flex items-center gap-2.5 mb-2">
+              <div className="relative">
+                <img
+                  src={spotlightUser.avatar}
+                  alt={spotlightUser.name}
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-amber-400"
+                />
+                <Crown className="w-3 h-3 text-amber-400 absolute -top-1 -right-1" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">{spotlightUser.name}</p>
+                <span className="text-[10px] text-amber-300 font-bold block truncate">
+                  {spotlightUser.text}
+                </span>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                setShowGiftTray(false);
-                setIsWalletModalOpen(true);
-              }}
-              className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black text-xs font-black shadow-md transition-colors"
-            >
-              شحن العملات
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Live Chat Input Bar */}
-      <form
-        onSubmit={handleSendMessage}
-        className="absolute bottom-0 inset-x-0 p-3 bg-black/80 backdrop-blur-md border-t border-white/10 z-30 flex items-center gap-2 pb-safe"
-      >
-        <input
-          type="text"
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value)}
-          placeholder="أرسل رسالة للبث المباشر..."
-          className="flex-1 bg-white/10 text-white placeholder-white/40 text-xs rounded-full px-4 py-2.5 outline-none focus:ring-1 focus:ring-rose-500"
-        />
-        <button
-          type="submit"
-          disabled={!inputVal.trim()}
-          className="p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white transition-colors"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+            {/* Comment / Answer Input Box */}
+            <form onSubmit={handleSendMessage} className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="اكتب الإجابة هنا..."
+                className="flex-1 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                type="submit"
+                className="p-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white transition-colors shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 };

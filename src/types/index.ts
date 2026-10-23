@@ -89,6 +89,23 @@ export interface FilterPreset {
 
 export type GiftTier = 'impact' | 'legendary' | 'royal' | 'diamond' | 'gold';
 
+export interface VerificationRequest {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorUsername: string;
+  creatorAvatar: string;
+  feeEgp: number; // 200 EGP
+  feeCoins: number;
+  status: 'pending' | 'approved' | 'rejected';
+  channelUrl: string;
+  category: string;
+  nationalIdMasked: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
 export interface GiftItem {
   id: string;
   nameAr: string;
@@ -97,6 +114,14 @@ export interface GiftItem {
   costCoins: number;
   tier: GiftTier;
   animationType:
+    | 'golden_lion'
+    | 'neon_tiger'
+    | 'golden_giraffe'
+    | 'cosmic_whale'
+    | 'golden_eagle'
+    | 'golden_trex'
+    | 'golden_triceratops'
+    | 'enigma_galaxy'
     | 'lion_king'
     | 'universe'
     | 'phoenix'
@@ -108,7 +133,6 @@ export interface GiftItem {
     | 'meteor_strike'
     | 'solar_eclipse'
     | 'lightning_storm'
-    | 'cosmic_whale'
     | 'supernova'
     | 'tiger'
     | 'wolf'
