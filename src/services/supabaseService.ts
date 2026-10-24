@@ -1,218 +1,204 @@
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { requireSupabase, isSupabaseConfigured } from '../lib/supabase';
+export type Language = 'ar' | 'en';
 
-export interface ProfileRecord {
+export type VideoCategory =
+  | 'education'
+  | 'comedy'
+  | 'tech'
+  | 'art'
+  | 'drama'
+  | 'animals'
+  | 'news'
+  | 'sports';
+
+export type VideoPrivacy = 'private_link' | 'public' | 'only_me';
+
+export interface Creator {
   id: string;
   username: string;
-  display_name: string;
-  level: number;
-  is_banned: boolean;
-  created_at: string;
+  displayName: string;
+  avatarUrl: string;
+  isVerified: boolean;
+  bio?: string;
+  followersCount: number;
+  followingCount?: number;
+  totalLikes?: string;
+  supporterLevel?: number; // e.g. 52
+  supporterTitle?: string;
+  vodafoneCashMasked?: string;
 }
 
-export interface WalletRecord {
-  user_id: string;
-  coins: number;
-  diamonds: number;
-  total_sent: number;
-  total_received: number;
-  updated_at: string;
+export interface Sound {
+  id: string;
+  title: string;
+  author: string;
+  coverUrl: string;
+  duration?: string;
+  usesCount?: number;
+  audioUrl?: string;
 }
 
-export function onAuthStateChange(
-  callback: (event: AuthChangeEvent, session: Session | null) => void,
-) {
-  if (!isSupabaseConfigured) {
-    return { data: { subscription: { unsubscribe: () => {} } } };
-  }
-  return requireSupabase().auth.onAuthStateChange(callback);
+export interface VideoStats {
+  likes: number;
+  comments: number;
+  bookmarks: number;
+  shares: number;
+  views: number;
 }
 
-export async function getCurrentSession(): Promise<Session | null> {
-  if (!isSupabaseConfigured) return null;
-  const { data, error } = await requireSupabase().auth.getSession();
-  if (error) throw error;
-  return data.session;
+export interface VideoItem {
+  id: string;
+  videoUrl: string;
+  fallbackUrl?: string;
+  posterUrl?: string;
+  caption: string;
+  hashtags: string[];
+  category: VideoCategory;
+  author: Creator;
+  music: Sound;
+  stats: VideoStats;
+  createdAt: string;
+  filterApplied?: string;
+  privacy?: VideoPrivacy; // 'private_link' = unlisted private
+  secretToken?: string;
+  isUserUploaded?: boolean;
 }
 
-export async function signInWithPassword(email: string, password: string): Promise<User> {
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail || !password) throw new Error('Email and password are required.');
-
-  const { data, error } = await requireSupabase().auth.signInWithPassword({
-    email: normalizedEmail,
-    password,
-  });
-  if (error) throw error;
-  if (!data.user) throw new Error('Supabase did not return an authenticated user.');
-  return data.user;
+export interface CommentItem {
+  id: string;
+  videoId: string;
+  author: {
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+    supporterLevel?: number;
+  };
+  text: string;
+  likes: number;
+  isLiked?: boolean;
+  createdAt: string;
 }
 
-export async function signUpWithPassword(
-  email: string,
-  password: string,
-  username: string,
-  displayName: string,
-): Promise<{ user: User | null; session: Session | null }> {
-  const normalizedEmail = email.trim().toLowerCase();
-  const normalizedUsername = username.trim();
-  const normalizedDisplayName = displayName.trim();
-
-  if (!normalizedEmail || !password) throw new Error('Email and password are required.');
-  if (password.length < 8) throw new Error('Password must contain at least 8 characters.');
-  if (!/^[a-zA-Z0-9_]{3,24}$/.test(normalizedUsername)) {
-    throw new Error('Username must be 3–24 characters and contain only letters, numbers, or underscores.');
-  }
-  if (normalizedDisplayName.length < 1 || normalizedDisplayName.length > 40) {
-    throw new Error('Display name must contain 1–40 characters.');
-  }
-
-  const { data, error } = await requireSupabase().auth.signUp({
-    email: normalizedEmail,
-    password,
-    options: {
-      data: {
-        username: normalizedUsername,
-        display_name: normalizedDisplayName,
-      },
-    },
-  });
-  if (error) throw error;
-  return { user: data.user, session: data.session };
+export interface FilterPreset {
+  id: string;
+  name: string;
+  nameAr: string;
+  cssFilter: string;
+  overlayClass?: string;
+  badge: string;
 }
 
-export async function signOut(): Promise<void> {
-  if (!isSupabaseConfigured) return;
-  const { error } = await requireSupabase().auth.signOut();
-  if (error) throw error;
+export type GiftTier = 'impact' | 'legendary' | 'royal' | 'diamond' | 'gold';
+
+export interface VerificationRequest {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorUsername: string;
+  creatorAvatar: string;
+  feeEgp: number; // 200 EGP
+  feeCoins: number;
+  status: 'pending' | 'approved' | 'rejected';
+  channelUrl: string;
+  category: string;
+  nationalIdMasked: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
 }
 
-export async function getProfile(userId: string): Promise<ProfileRecord | null> {
-  if (!userId) throw new Error('A user ID is required.');
-  if (!isSupabaseConfigured) return null;
-
-  try {
-    const { data, error } = await requireSupabase()
-      .from('profiles')
-      .select('id, username, display_name, level, is_banned, created_at')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data as ProfileRecord | null;
-  } catch (err) {
-    console.warn('[Supabase] Failed to fetch profile:', err);
-    return null;
-  }
-}
-
-export async function getWallet(userId: string): Promise<WalletRecord | null> {
-  if (!userId) throw new Error('A user ID is required.');
-  if (!isSupabaseConfigured) return null;
-
-  try {
-    const { data, error } = await requireSupabase()
-      .from('wallets')
-      .select('user_id, coins, diamonds, total_sent, total_received, updated_at')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data as WalletRecord | null;
-  } catch (err) {
-    console.warn('[Supabase] Failed to fetch wallet:', err);
-    return null;
-  }
-}
-
-/**
- * Read-only smoke test. Verifies connection safely without unhandled throws.
- */
-export async function checkSupabaseConnection(): Promise<{
-  connected: boolean;
-  profileTableAccessible: boolean;
-  error?: string;
-}> {
-  if (!isSupabaseConfigured) {
-    return { connected: false, profileTableAccessible: false, error: 'Supabase credentials not configured' };
-  }
-  try {
-    const { error } = await requireSupabase().from('profiles').select('id').limit(1);
-    if (error) {
-      return { connected: false, profileTableAccessible: false, error: error.message };
-    }
-    return { connected: true, profileTableAccessible: true };
-  } catch (err: any) {
-    return { connected: false, profileTableAccessible: false, error: err?.message || 'Connection failed' };
-  }
-}
-
-/**
- * RPC wrappers for backend transactions: send_gift, request_deposit, request_withdrawal
- */
-export async function sendGiftRpc(params: {
-  senderId: string;
-  recipientId: string;
-  giftId: string;
+export interface GiftItem {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  emoji: string;
   costCoins: number;
-}): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured) return { success: true };
-  try {
-    const { error } = await requireSupabase().rpc('send_gift', {
-      p_sender_id: params.senderId,
-      p_recipient_id: params.recipientId,
-      p_gift_id: params.giftId,
-      p_cost_coins: params.costCoins,
-    });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Failed to execute send_gift' };
-  }
+  tier: GiftTier;
+  animationType:
+    | 'golden_lion'
+    | 'neon_tiger'
+    | 'golden_giraffe'
+    | 'cosmic_whale'
+    | 'golden_eagle'
+    | 'golden_trex'
+    | 'golden_triceratops'
+    | 'enigma_galaxy'
+    | 'lion_king'
+    | 'universe'
+    | 'phoenix'
+    | 'dragon'
+    | 'burj_khalifa'
+    | 'galaxy_fleet'
+    | 'diamond_rain'
+    | 'golden_citadel'
+    | 'meteor_strike'
+    | 'solar_eclipse'
+    | 'lightning_storm'
+    | 'supernova'
+    | 'tiger'
+    | 'wolf'
+    | 'panther'
+    | 'falcon'
+    | 'hypercar'
+    | 'private_jet'
+    | 'big_bang';
+  descriptionAr: string;
 }
 
-export async function requestDepositRpc(params: {
-  userId: string;
-  amountUsd: number;
+export interface WalletTransaction {
+  id: string;
+  type: 'deposit' | 'withdraw' | 'gift_sent' | 'gift_received';
   amountCoins: number;
-  phone: string;
-  referenceNumber: string;
-}): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured) return { success: true };
-  try {
-    const { error } = await requireSupabase().rpc('request_deposit', {
-      p_user_id: params.userId,
-      p_amount_usd: params.amountUsd,
-      p_coins: params.amountCoins,
-      p_phone: params.phone,
-      p_ref: params.referenceNumber,
-    });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Failed to execute request_deposit' };
-  }
+  amountFiat: number;
+  currency: string;
+  status: 'completed' | 'processing' | 'failed';
+  timestamp: string;
+  note: string;
+  paymentMethod?: 'vodafone_cash' | 'bank_iban' | 'apple_pay' | 'card';
+  accountRefMasked?: string;
+  referenceNumber?: string;
 }
 
-export async function requestWithdrawalRpc(params: {
-  userId: string;
-  amountUsd: number;
-  amountCoins: number;
-  targetAccount: string;
-  referenceNumber: string;
-}): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured) return { success: true };
-  try {
-    const { error } = await requireSupabase().rpc('request_withdrawal', {
-      p_user_id: params.userId,
-      p_amount_usd: params.amountUsd,
-      p_coins: params.amountCoins,
-      p_target_account: params.targetAccount,
-      p_ref: params.referenceNumber,
-    });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Failed to execute request_withdrawal' };
-  }
+export interface UserWallet {
+  coinsBalance: number;
+  diamondsBalance: number;
+  fiatBalance: number;
+  currency: string;
+  vodafoneCashNumber: string;
+  vodafoneCashMasked: string;
+  linkedIban: string;
+  cryptoAddress?: string;
+  transactions: WalletTransaction[];
 }
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isEncrypted: boolean;
+  isSender: boolean;
+}
+
+export interface StreamSettings4K {
+  resolution: '4K_UHD' | '2K_QHD' | '1080p_FHD' | '720p_HD';
+  fps: 60 | 30;
+  videoBitrateKbps: number;
+  audioBitrateKbps: number;
+  encoder: 'NVENC_AV1' | 'NVENC_HEVC' | 'NVENC_H264' | 'X264_CPU' | 'QUICKSYNC';
+  rtmpServer: string;
+  streamKey: string;
+  latencyMode: 'ultra_low' | 'low' | 'normal';
+}
+
+export type MainTab =
+  | 'feed'
+  | 'discover'
+  | 'upload'
+  | 'live'
+  | 'obs_studio'
+  | 'messages'
+  | 'profile'
+  | 'backstage';
+
+export type FeedType = 'foryou' | 'following';

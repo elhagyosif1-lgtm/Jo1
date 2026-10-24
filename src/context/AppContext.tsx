@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   VideoItem,
   CommentItem,
@@ -12,9 +12,22 @@ import {
   GiftItem,
   UserWallet,
   WalletTransaction,
-  VerificationRequest
+  VerificationRequest,
 } from '../types';
 import { INITIAL_VIDEOS, INITIAL_COMMENTS, TRENDING_SOUNDS } from '../data/initialVideos';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { USD_TO_EGP_RATE } from '../services/vodafoneCashService';
+import {
+  getCurrentSession,
+  onAuthStateChange,
+  getWallet,
+  getAppSettings,
+  listMyRequests,
+  requestDeposit,
+  requestWithdrawal,
+  type DepositRequestRecord,
+  type WithdrawalRequestRecord,
+} from '../services/supabaseService';
 import { sendGiftRpc } from '../services/supabaseService';
 import { MR_JOO_FOUNDER_AVATAR } from '../assets/mrJooAssets';
 
@@ -71,11 +84,10 @@ interface AppContextType {
   wallet: UserWallet;
   isWalletModalOpen: boolean;
   setIsWalletModalOpen: (open: boolean) => void;
-  updateWalletDetails: (updates: { vodafoneCashNumber?: string; linkedIban?: string }) => void;
-  depositCoins: (coins: number, fiatUsd: number, customNote?: string, referenceCode?: string) => void;
-  withdrawCash: (fiatUsd: number, targetAccount: string, provider: string, customRef?: string) => void;
-  setExactCoinsBalance: (coins: number) => void;
-  resetTo100kCoins: () => void;
+  walletStatus: WalletStatus;
+  refreshWallet: () => Promise<void>;
+  submitDeposit: (amountEgp: number, vfNumber: string, txRef: string) => Promise<string>;
+  submitWithdrawal: (amountUsd: number, vfNumber: string) => Promise<{ id: string; diamonds: number }>;
   activeGiftAnimation: GiftItem | null;
   triggerGiftAnimation: (gift: GiftItem, recipientCreator?: Creator) => boolean;
   clearGiftAnimation: () => void;
@@ -102,8 +114,83 @@ const LOCAL_STORAGE_WALLET_KEY = 'jo1_user_wallet_v3';
 const LOCAL_STORAGE_AUTO_ADVANCE_KEY = 'jo1_auto_advance_videos';
 const LOCAL_STORAGE_VERIFICATIONS_KEY = 'jo1_verification_requests_v1';
 
+type WalletStatus = 'signed_out' | 'loading' | 'ready' | 'error';
+
+const EMPTY_WALLET: UserWallet = {
+  coinsBalance: 0,
+  diamondsBalance: 0,
+  fiatBalance: 0,
+  currency: 'USD',
+  vodafoneCashNumber: '',
+  vodafoneCashMasked: '',
+  linkedIban: '',
+  transactions: [],
+};
+
+const maskPhone = (value: string) => (value && value.length >= 6 ? `${value.slice(0, 3)}*****${value.slice(-3)}` : value);
+
+function mapRequestsToTransactions(
+  deposits: DepositRequestRecord[],
+  withdrawals: WithdrawalRequestRecord[],
+): WalletTransaction[] {
+  const rows: Array<{ ts: number; tx: WalletTransaction }> = [];
+
+  for (const d of deposits) {
+    const status = d.status === 'approved' ? 'completed' : d.status === 'rejected' ? 'failed' : 'processing';
+    const note =
+      d.status === 'approved'
+        ? 'تمت الموافقة وإضافة العملات إلى رصيدك'
+        : d.status === 'rejected'
+          ? `تم رفض طلب الإيداع${d.note ? ` — ${d.note}` : ''}`
+          : 'طلب إيداع قيد المراجعة';
+    rows.push({
+      ts: new Date(d.created_at).getTime(),
+      tx: {
+        id: `dep-${d.id}`,
+        type: 'deposit',
+        amountCoins: Number(d.coins),
+        amountFiat: Number((Number(d.amount_egp) / USD_TO_EGP_RATE).toFixed(2)),
+        currency: 'USD',
+        status,
+        timestamp: new Date(d.created_at).toLocaleString('ar-EG'),
+        note,
+        paymentMethod: 'vodafone_cash',
+        accountRefMasked: maskPhone(d.vf_number),
+        referenceNumber: d.tx_ref,
+      },
+    });
+  }
+
+  for (const w of withdrawals) {
+    const status = w.status === 'paid' ? 'completed' : w.status === 'rejected' ? 'failed' : 'processing';
+    const note =
+      w.status === 'paid'
+        ? `تم تحويل المبلغ إلى ${maskPhone(w.vf_number)}${w.note ? ` — مرجع: ${w.note}` : ''}`
+        : w.status === 'rejected'
+          ? `تم رفض طلب السحب وإرجاع الرصيد${w.note ? ` — ${w.note}` : ''}`
+          : 'طلب سحب قيد المراجعة (الرصيد محجوز)';
+    rows.push({
+      ts: new Date(w.created_at).getTime(),
+      tx: {
+        id: `wd-${w.id}`,
+        type: 'withdraw',
+        amountCoins: Number(w.diamonds),
+        amountFiat: Number((Number(w.amount_egp) / USD_TO_EGP_RATE).toFixed(2)),
+        currency: 'USD',
+        status,
+        timestamp: new Date(w.created_at).toLocaleString('ar-EG'),
+        note,
+        paymentMethod: 'vodafone_cash',
+        accountRefMasked: maskPhone(w.vf_number),
+        referenceNumber: w.id.slice(0, 8),
+      },
+    });
+  }
+
+  return rows.sort((a, b) => b.ts - a.ts).map(r => r.tx);
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current user: MR JOO — Founder & CEO with ENIGMA Level 52 Imperial Supporter Crest
   const [currentUser, setCurrentUser] = useState<Creator>(() => {
     return {
       id: 'current-user-1',
@@ -121,7 +208,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
-  // Enterprise Broadcaster Verification State (Paid 200 EGP Program)
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>(() => {
     try {
@@ -222,87 +308,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
   };
 
-  // Persistent Real Wallet (1,000 coins = $5 USD => 100,000 coins = $500.00 USD)
-  const [wallet, setWallet] = useState<UserWallet>(() => {
-    const TARGET_COINS = 100000;
-    const TARGET_FIAT = 500.00;
+  const [wallet, setWallet] = useState<UserWallet>(EMPTY_WALLET);
+  const [walletStatus, setWalletStatus] = useState<WalletStatus>('loading');
+
+  const refreshWallet = useCallback(async (): Promise<void> => {
+    if (!isSupabaseConfigured) {
+      setWallet(EMPTY_WALLET);
+      setWalletStatus('signed_out');
+      return;
+    }
 
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_WALLET_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Valid non-negative balance preservation (fixes issue of reverting spent coins back to 100k)
-        const coins =
-          typeof parsed.coinsBalance === 'number' && !isNaN(parsed.coinsBalance) && parsed.coinsBalance >= 0
-            ? parsed.coinsBalance
-            : TARGET_COINS;
-        const fiat = Number((coins * 0.005).toFixed(2));
-
-        const validatedWallet: UserWallet = {
-          ...parsed,
-          coinsBalance: coins,
-          fiatBalance: fiat,
-          currency: 'USD',
-          vodafoneCashNumber: parsed.vodafoneCashNumber || '01090718514',
-          vodafoneCashMasked: parsed.vodafoneCashMasked || '010*****514',
-          linkedIban: parsed.linkedIban || 'EG80 4000 0000 1234 5678 9012',
-          transactions: Array.isArray(parsed.transactions) && parsed.transactions.length > 0 ? parsed.transactions : [
-            {
-              id: 'tx-init-100k',
-              type: 'deposit',
-              amountCoins: 100000,
-              amountFiat: 500.00,
-              currency: 'USD',
-              status: 'completed',
-              timestamp: 'الآن',
-              note: 'رصيد مؤكد معتمد بمحفظة فودافون كاش (100,000 عملة = 500$ دولار / 25,250 ج.م)',
-              paymentMethod: 'vodafone_cash',
-              accountRefMasked: '010*****514',
-              referenceNumber: 'VF-CASH-100K-90718514',
-            },
-          ],
-        };
-        try {
-          localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(validatedWallet));
-        } catch {}
-        return validatedWallet;
+      const session = await getCurrentSession();
+      if (!session) {
+        setWallet(EMPTY_WALLET);
+        setWalletStatus('signed_out');
+        return;
       }
-    } catch {}
 
-    const initialWallet: UserWallet = {
-      coinsBalance: TARGET_COINS,
-      fiatBalance: TARGET_FIAT,
-      currency: 'USD',
-      vodafoneCashNumber: '01090718514',
-      vodafoneCashMasked: '010*****514',
-      linkedIban: 'EG80 4000 0000 1234 5678 9012',
-      transactions: [
-        {
-          id: 'tx-init-100k',
-          type: 'deposit',
-          amountCoins: 100000,
-          amountFiat: 500.00,
-          currency: 'USD',
-          status: 'completed',
-          timestamp: 'الآن',
-          note: 'رصيد مؤكد معتمد بمحفظة فودافون كاش (100,000 عملة = 500$ دولار / 25,250 ج.م)',
-          paymentMethod: 'vodafone_cash',
-          accountRefMasked: '010*****514',
-          referenceNumber: 'VF-CASH-100K-90718514',
-        },
-      ],
-    };
-    try {
-      localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(initialWallet));
-    } catch {}
-    return initialWallet;
-  });
+      const [row, settings, requests] = await Promise.all([
+        getWallet(session.user.id),
+        getAppSettings(),
+        listMyRequests(),
+      ]);
+
+      const diamondsPerEgp = settings && settings.diamonds_per_egp > 0 ? settings.diamonds_per_egp : 10;
+      const diamonds = Number(row?.diamonds ?? 0);
+
+      setWallet({
+        ...EMPTY_WALLET,
+        coinsBalance: Number(row?.coins ?? 0),
+        diamondsBalance: diamonds,
+        fiatBalance: Number((diamonds / diamondsPerEgp / USD_TO_EGP_RATE).toFixed(2)),
+        vodafoneCashNumber: row?.phone || '',
+        vodafoneCashMasked: row?.phone ? maskPhone(row.phone) : '',
+        transactions: mapRequestsToTransactions(requests.deposits, requests.withdrawals),
+      });
+      setWalletStatus('ready');
+    } catch {
+      setWallet(EMPTY_WALLET);
+      setWalletStatus('error');
+    }
+  }, []);
 
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<GiftItem | null>(null);
   const [activeGiftModalVideo, setActiveGiftModalVideo] = useState<VideoItem | null>(null);
 
-  // Check URL query parameters for ?v=<id> (secret private link)
   const [directVideoIdParam] = useState<string | null>(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -366,39 +418,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.lang = language;
   }, [language]);
 
-  // Real-time persistent sync for wallet balance across tabs and windows
   useEffect(() => {
-    let channel: BroadcastChannel | null = null;
     try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        channel = new BroadcastChannel('jo1_wallet_sync');
-        channel.onmessage = (event) => {
-          if (event.data && typeof event.data.coinsBalance === 'number') {
-            setWallet(event.data);
-          }
-        };
-      }
+      localStorage.removeItem(LOCAL_STORAGE_WALLET_KEY);
     } catch {}
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === LOCAL_STORAGE_WALLET_KEY && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed && typeof parsed.coinsBalance === 'number') {
-            setWallet(parsed);
-          }
-        } catch {}
-      }
-    };
+    void refreshWallet();
 
-    window.addEventListener('storage', handleStorage);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      if (channel) channel.close();
-    };
-  }, []);
+    if (!isSupabaseConfigured) return;
 
-  // If a direct private link was opened (e.g. ?v=id), jump to that video
+    const { data } = onAuthStateChange(() => {
+      setTimeout(() => {
+        void refreshWallet();
+      }, 0);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [refreshWallet]);
+
   useEffect(() => {
     if (directVideoIdParam) {
       const targetIdx = videos.findIndex(v => v.id === directVideoIdParam);
@@ -424,7 +460,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
   };
 
-  // Link and update personal wallet accounts (Vodafone Cash, IBAN)
   const updateWalletDetails = (updates: { vodafoneCashNumber?: string; linkedIban?: string }) => {
     setWallet(prev => {
       const num = updates.vodafoneCashNumber ? updates.vodafoneCashNumber.trim() : prev.vodafoneCashNumber;
@@ -435,141 +470,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         vodafoneCashMasked: masked,
         linkedIban: updates.linkedIban ? updates.linkedIban.trim() : prev.linkedIban,
       };
-      try {
-        localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(updated));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('jo1_wallet_sync');
-          bc.postMessage(updated);
-          bc.close();
-        }
-      } catch {}
       return updated;
     });
   };
 
-  // Fixed Deposit & Withdraw calculations (1,000 coins = $5 USD => 1 coin = $0.005)
-  const depositCoins = (coins: number, fiatUsd: number, customNote?: string, referenceCode?: string) => {
-    setWallet(prev => {
-      const newCoins = prev.coinsBalance + coins;
-      const newFiat = Number((newCoins * 0.005).toFixed(2));
-      const refCode = referenceCode || `VF-DEP-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      const newTx: WalletTransaction = {
-        id: `tx-${Date.now()}`,
-        type: 'deposit',
-        amountCoins: coins,
-        amountFiat: fiatUsd,
-        currency: 'USD',
-        status: 'completed',
-        timestamp: 'الآن',
-        note: customNote || `شحن فودافون كاش فوري (+${coins.toLocaleString()} عملة)`,
-        paymentMethod: 'vodafone_cash',
-        accountRefMasked: prev.vodafoneCashMasked,
-        referenceNumber: refCode,
-      };
-
-      const updated: UserWallet = {
-        ...prev,
-        coinsBalance: newCoins,
-        fiatBalance: newFiat,
-        transactions: [newTx, ...prev.transactions],
-      };
-
-      try {
-        localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(updated));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('jo1_wallet_sync');
-          bc.postMessage(updated);
-          bc.close();
-        }
-      } catch {}
-      return updated;
-    });
+  const submitDeposit = async (amountEgp: number, vfNumber: string, txRef: string): Promise<string> => {
+    const id = await requestDeposit(amountEgp, vfNumber, txRef);
+    await refreshWallet();
+    return id;
   };
 
-  const withdrawCash = (fiatUsd: number, targetAccount: string, provider: string, customRef?: string) => {
-    setWallet(prev => {
-      const coinsToDeduct = Math.round(fiatUsd / 0.005);
-      const newCoins = Math.max(0, prev.coinsBalance - coinsToDeduct);
-      const newFiat = Number((newCoins * 0.005).toFixed(2));
-      const refCode = customRef || `VF-WTH-${Math.floor(100000 + Math.random() * 900000)}`;
-      const maskedTarget = targetAccount.length >= 6 ? `${targetAccount.slice(0, 3)}*****${targetAccount.slice(-3)}` : targetAccount;
+  const submitWithdrawal = async (
+    amountUsd: number,
+    vfNumber: string,
+  ): Promise<{ id: string; diamonds: number }> => {
+    const settings = await getAppSettings();
+    if (!settings || !(settings.diamonds_per_egp > 0)) {
+      throw new Error('INVALID_WITHDRAWAL_SETTINGS');
+    }
 
-      const newTx: WalletTransaction = {
-        id: `tx-${Date.now()}`,
-        type: 'withdraw',
-        amountCoins: coinsToDeduct,
-        amountFiat: fiatUsd,
-        currency: 'USD',
-        status: 'completed',
-        timestamp: 'الآن',
-        note: `سحب نقدي $${fiatUsd} إلى ${provider} (${maskedTarget})`,
-        paymentMethod: 'vodafone_cash',
-        accountRefMasked: prev.vodafoneCashMasked,
-        referenceNumber: refCode,
-      };
-
-      const updated: UserWallet = {
-        ...prev,
-        coinsBalance: newCoins,
-        fiatBalance: newFiat,
-        transactions: [newTx, ...prev.transactions],
-      };
-
-      try {
-        localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(updated));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('jo1_wallet_sync');
-          bc.postMessage(updated);
-          bc.close();
-        }
-      } catch {}
-      return updated;
-    });
+    const diamonds = Math.round(amountUsd * USD_TO_EGP_RATE * settings.diamonds_per_egp);
+    const id = await requestWithdrawal(diamonds, vfNumber);
+    await refreshWallet();
+    return { id, diamonds };
   };
 
-  const setExactCoinsBalance = (coins: number) => {
-    setWallet(prev => {
-      const sanitizedCoins = Math.max(0, Math.round(coins));
-      const fiat = Number((sanitizedCoins * 0.005).toFixed(2));
-      const updated: UserWallet = {
-        ...prev,
-        coinsBalance: sanitizedCoins,
-        fiatBalance: fiat,
-        transactions: [
-          {
-            id: `tx-${Date.now()}`,
-            type: 'deposit',
-            amountCoins: sanitizedCoins,
-            amountFiat: fiat,
-            currency: 'USD',
-            status: 'completed',
-            timestamp: 'الآن',
-            note: `تأكيد وتثبيت رصيد المحفظة إلى ${sanitizedCoins.toLocaleString()} عملة`,
-            paymentMethod: 'vodafone_cash',
-            accountRefMasked: prev.vodafoneCashMasked,
-            referenceNumber: `VF-SYNC-${Date.now().toString().slice(-6)}`,
-          },
-          ...prev.transactions,
-        ],
-      };
-      try {
-        localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(updated));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('jo1_wallet_sync');
-          bc.postMessage(updated);
-          bc.close();
-        }
-      } catch {}
-      return updated;
-    });
-  };
-
-  const resetTo100kCoins = () => {
-    setExactCoinsBalance(100000);
-  };
-
-  // Safe gift sending with balance validation, transaction record, and full screen impact animation
   const triggerGiftAnimation = (gift: GiftItem, recipientCreator?: Creator): boolean => {
     if (wallet.coinsBalance < gift.costCoins) {
       return false;
@@ -600,18 +525,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...prev.transactions,
         ],
       };
-      try {
-        localStorage.setItem(LOCAL_STORAGE_WALLET_KEY, JSON.stringify(updated));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('jo1_wallet_sync');
-          bc.postMessage(updated);
-          bc.close();
-        }
-      } catch {}
       return updated;
     });
 
-    // Notify backend RPC safely
     if (recipientCreator?.id) {
       sendGiftRpc({
         senderId: currentUser.id,
@@ -654,7 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           }
           return v;
-        })
+        }),
       );
       return next;
     });
@@ -685,7 +601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           }
           return v;
-        })
+        }),
       );
       return next;
     });
@@ -743,7 +659,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         return v;
-      })
+      }),
     );
   };
 
@@ -767,7 +683,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Video publishing with default public visibility, preserving creator ownership
   const publishVideo = (data: {
     videoUrl: string;
     caption: string;
@@ -819,32 +734,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(prev => ({ ...prev, ...updates }));
   };
 
-  // Filtered videos: Author can always see their own videos, plus public videos and direct shared links
   const filteredVideos = React.useMemo(() => {
     let list = videos.filter(v => {
-      // If video is only_me, only the author can see it
       if (v.privacy === 'only_me') {
         return v.author.id === currentUser.id;
       }
-      // If video is private_link, it's visible to the author OR if accessed via direct secret link (?v=id)
       if (v.privacy === 'private_link') {
         return directVideoIdParam === v.id || v.author.id === currentUser.id;
       }
       return true;
     });
 
-    // Followed Creators feed
     if (feedType === 'following') {
-      const followingList = list.filter(
-        v => followingCreatorIds.has(v.author.id) || v.isUserUploaded
-      );
+      const followingList = list.filter(v => followingCreatorIds.has(v.author.id) || v.isUserUploaded);
       if (followingList.length > 0) {
         list = followingList;
       }
     } else {
-      // Recommendation algorithm sorting
       list.sort((a, b) => {
-        // If direct param matched, put at very top
         if (directVideoIdParam && a.id === directVideoIdParam) return -1;
         if (directVideoIdParam && b.id === directVideoIdParam) return 1;
 
@@ -863,7 +770,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           v.caption.toLowerCase().includes(q) ||
           v.author.username.toLowerCase().includes(q) ||
           v.author.displayName.toLowerCase().includes(q) ||
-          v.hashtags.some(tag => tag.toLowerCase().includes(q))
+          v.hashtags.some(tag => tag.toLowerCase().includes(q)),
       );
     }
     return list;
@@ -950,11 +857,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         wallet,
         isWalletModalOpen,
         setIsWalletModalOpen,
-        updateWalletDetails,
-        depositCoins,
-        withdrawCash,
-        setExactCoinsBalance,
-        resetTo100kCoins,
+        walletStatus,
+        refreshWallet,
+        submitDeposit,
+        submitWithdrawal,
         activeGiftAnimation,
         triggerGiftAnimation,
         clearGiftAnimation,
@@ -982,3 +888,5 @@ export const useApp = () => {
   }
   return context;
 };
+
+export type WalletStatus = 'signed_out' | 'loading' | 'ready' | 'error';
