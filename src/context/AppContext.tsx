@@ -87,7 +87,7 @@ interface AppContextType {
   walletStatus: WalletStatus;
   refreshWallet: () => Promise<void>;
   submitDeposit: (amountEgp: number, vfNumber: string, txRef: string) => Promise<string>;
-  submitWithdrawal: (amountUsd: number, vfNumber: string) => Promise<{ id: string; diamonds: number }>;
+  submitWithdrawal: (amountEgp: number, vfNumber: string) => Promise<{ id: string; diamonds: number }>;
   activeGiftAnimation: GiftItem | null;
   triggerGiftAnimation: (gift: GiftItem, recipientCreator?: Creator) => boolean;
   clearGiftAnimation: () => void;
@@ -329,7 +329,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         transactions: mapRequestsToTransactions(requests.deposits, requests.withdrawals),
       });
       setWalletStatus('ready');
-    } catch {
+    } catch (error) {
+      console.error('[AppContext] Failed to refresh wallet:', error);
       setWallet(EMPTY_WALLET);
       setWalletStatus('error');
     }
@@ -454,14 +455,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitWithdrawal = async (
-    amountUsd: number,
+    amountEgp: number,
     vfNumber: string,
   ): Promise<{ id: string; diamonds: number }> => {
+    if (!Number.isFinite(amountEgp) || amountEgp <= 0) {
+      throw new Error('BAD_AMOUNT');
+    }
+
     const settings = await getAppSettings();
     if (!settings || !(settings.diamonds_per_egp > 0)) {
       throw new Error('INVALID_WITHDRAWAL_SETTINGS');
     }
-    const diamonds = Math.round(amountUsd * USD_TO_EGP_RATE * settings.diamonds_per_egp);
+
+    const diamonds = Math.max(1, Math.round(amountEgp / settings.diamonds_per_egp));
     const id = await requestWithdrawal(diamonds, vfNumber);
     await refreshWallet();
     return { id, diamonds };

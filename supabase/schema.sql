@@ -68,6 +68,38 @@ begin
 end;
 $$;
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, username, display_name, level, is_banned, created_at)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'display_name', 'User'),
+    0,
+    false,
+    now()
+  )
+  on conflict (id) do nothing;
+
+  insert into public.wallets (user_id, coins, diamonds, total_sent, total_received, phone, updated_at)
+  values (new.id, 0, 0, 0, 0, null, now())
+  on conflict (user_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row
+execute function public.handle_new_user();
+
 create or replace function public.request_deposit(
   p_amount_egp integer,
   p_vf_number text,
@@ -180,6 +212,58 @@ begin
 end;
 $$;
 
+create or replace function public.update_wallet_after_deposit_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.status = 'approved' and old.status is distinct from 'approved' then
+    update public.wallets
+    set
+      coins = coins + new.coins,
+      total_received = total_received + new.coins,
+      updated_at = now()
+    where user_id = new.user_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.update_wallet_after_withdrawal_payment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.status = 'paid' and old.status is distinct from 'paid' then
+    update public.wallets
+    set
+      diamonds = diamonds - new.diamonds,
+      total_sent = total_sent + new.diamonds,
+      updated_at = now()
+    where user_id = new.user_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_update_wallet_after_deposit_approval on public.deposits;
+create trigger trg_update_wallet_after_deposit_approval
+after update on public.deposits
+for each row
+execute function public.update_wallet_after_deposit_approval();
+
+drop trigger if exists trg_update_wallet_after_withdrawal_payment on public.withdrawals;
+create trigger trg_update_wallet_after_withdrawal_payment
+after update on public.withdrawals
+for each row
+execute function public.update_wallet_after_withdrawal_payment();
+
 insert into public.app_settings (id, coins_per_egp, diamonds_per_egp, min_withdraw_diamonds, vodafone_number, maintenance)
 values (1, 10, 10, 100, '01090718514', false)
 on conflict (id) do nothing;
@@ -217,3 +301,7 @@ with check (auth.uid() = user_id);
 
 create policy "Users can create profile entries" on public.profiles
 for insert with check (auth.uid() = id);
+
+create policy "Users can update only their own profile" on public.profiles
+for update using (auth.uid() = id)
+with check (auth.uid() = id);

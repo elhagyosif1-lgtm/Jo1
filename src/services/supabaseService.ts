@@ -188,16 +188,23 @@ export async function listMyRequests(): Promise<{
   deposits: DepositRequestRecord[];
   withdrawals: WithdrawalRequestRecord[];
 }> {
+  const session = await getCurrentSession();
+  if (!session) {
+    return { deposits: [], withdrawals: [] };
+  }
+
   const client = requireSupabase();
   const [deposits, withdrawals] = await Promise.all([
     client
       .from('deposits')
       .select('id, amount_egp, coins, vf_number, tx_ref, status, note, created_at')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
       .limit(50),
     client
       .from('withdrawals')
       .select('id, diamonds, amount_egp, vf_number, status, note, created_at')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
       .limit(50),
   ]);
@@ -211,19 +218,39 @@ export async function listMyRequests(): Promise<{
 }
 
 export async function requestDeposit(amountEgp: number, vfNumber: string, txRef: string): Promise<string> {
+  if (!Number.isFinite(amountEgp) || amountEgp <= 0) {
+    throw new Error('BAD_AMOUNT');
+  }
+  const cleanVf = vfNumber.trim();
+  const cleanTxRef = txRef.trim();
+  if (!cleanVf || cleanVf.replace(/[^0-9]/g, '').length < 11) {
+    throw new Error('BAD_VF_NUMBER');
+  }
+  if (!cleanTxRef || cleanTxRef.length < 4) {
+    throw new Error('BAD_TX_REFERENCE');
+  }
+
   const { data, error } = await requireSupabase().rpc('request_deposit', {
     p_amount_egp: Math.round(amountEgp),
-    p_vf_number: vfNumber.trim(),
-    p_tx_ref: txRef.trim(),
+    p_vf_number: cleanVf,
+    p_tx_ref: cleanTxRef,
   });
   if (error) throw error;
   return data as string;
 }
 
 export async function requestWithdrawal(diamonds: number, vfNumber: string): Promise<string> {
+  if (!Number.isFinite(diamonds) || diamonds <= 0) {
+    throw new Error('BAD_AMOUNT');
+  }
+  const cleanVf = vfNumber.trim();
+  if (!cleanVf || cleanVf.replace(/[^0-9]/g, '').length < 11) {
+    throw new Error('BAD_VF_NUMBER');
+  }
+
   const { data, error } = await requireSupabase().rpc('request_withdrawal', {
     p_diamonds: Math.round(diamonds),
-    p_vf_number: vfNumber.trim(),
+    p_vf_number: cleanVf,
   });
   if (error) throw error;
   return data as string;
