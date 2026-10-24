@@ -15,6 +15,7 @@ import {
   VerificationRequest,
 } from '../types';
 import { INITIAL_VIDEOS, INITIAL_COMMENTS, TRENDING_SOUNDS } from '../data/initialVideos';
+import { MR_JOO_FOUNDER_AVATAR } from '../assets/mrJooAssets';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { USD_TO_EGP_RATE } from '../services/vodafoneCashService';
 import {
@@ -28,8 +29,6 @@ import {
   type DepositRequestRecord,
   type WithdrawalRequestRecord,
 } from '../services/supabaseService';
-import { sendGiftRpc } from '../services/supabaseService';
-import { MR_JOO_FOUNDER_AVATAR } from '../assets/mrJooAssets';
 
 interface AppContextType {
   videos: VideoItem[];
@@ -84,6 +83,7 @@ interface AppContextType {
   wallet: UserWallet;
   isWalletModalOpen: boolean;
   setIsWalletModalOpen: (open: boolean) => void;
+  updateWalletDetails: (updates: { vodafoneCashNumber?: string; linkedIban?: string }) => void;
   walletStatus: WalletStatus;
   refreshWallet: () => Promise<void>;
   submitDeposit: (amountEgp: number, vfNumber: string, txRef: string) => Promise<string>;
@@ -191,22 +191,20 @@ function mapRequestsToTransactions(
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<Creator>(() => {
-    return {
-      id: 'current-user-1',
-      username: 'mr_joo_official',
-      displayName: 'MR JOO 👑',
-      avatarUrl: MR_JOO_FOUNDER_AVATAR,
-      isVerified: true,
-      bio: 'المؤسس والمدير التنفيذي لمنصة Jo1 | أعلى داعم إمبراطوري ENIGMA Level 52 👑💎',
-      followersCount: 245000,
-      followingCount: 150,
-      totalLikes: '4.8M',
-      supporterLevel: 52,
-      supporterTitle: 'داعم إمبراطوري أسطوري (ENIGMA Level 52)',
-      vodafoneCashMasked: '010*****514',
-    };
-  });
+  const [currentUser, setCurrentUser] = useState<Creator>(() => ({
+    id: 'current-user-1',
+    username: 'mr_joo_official',
+    displayName: 'MR JOO 👑',
+    avatarUrl: MR_JOO_FOUNDER_AVATAR,
+    isVerified: true,
+    bio: 'المؤسس والمدير التنفيذي لمنصة Jo1 | أعلى داعم إمبراطوري ENIGMA Level 52 👑💎',
+    followersCount: 245000,
+    followingCount: 150,
+    totalLikes: '4.8M',
+    supporterLevel: 52,
+    supporterTitle: 'داعم إمبراطوري أسطوري (ENIGMA Level 52)',
+    vodafoneCashMasked: '010*****514',
+  }));
 
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>(() => {
@@ -247,18 +245,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const submitVerificationRequest = (reqData: Omit<VerificationRequest, 'id' | 'submittedAt' | 'status'>) => {
-    const newReq: VerificationRequest = {
-      ...reqData,
-      id: `ver-req-${Date.now()}`,
-      status: 'pending',
-      submittedAt: 'الآن',
-    };
-
+    const newReq: VerificationRequest = { ...reqData, id: `ver-req-${Date.now()}`, status: 'pending', submittedAt: 'الآن' };
     setVerificationRequests(prev => {
       const updated = [newReq, ...prev];
-      try {
-        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
-      } catch {}
+      try { localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -266,9 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approveVerificationRequest = (requestId: string) => {
     setVerificationRequests(prev => {
       const updated = prev.map(r => (r.id === requestId ? { ...r, status: 'approved' as const, reviewedAt: 'الآن' } : r));
-      try {
-        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
-      } catch {}
+      try { localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -276,9 +264,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rejectVerificationRequest = (requestId: string, note?: string) => {
     setVerificationRequests(prev => {
       const updated = prev.map(r => (r.id === requestId ? { ...r, status: 'rejected' as const, reviewNote: note, reviewedAt: 'الآن' } : r));
-      try {
-        localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated));
-      } catch {}
+      try { localStorage.setItem(LOCAL_STORAGE_VERIFICATIONS_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -303,9 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setAutoAdvanceVideos = (enable: boolean) => {
     setAutoAdvanceVideosState(enable);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_AUTO_ADVANCE_KEY, JSON.stringify(enable));
-    } catch {}
+    try { localStorage.setItem(LOCAL_STORAGE_AUTO_ADVANCE_KEY, JSON.stringify(enable)); } catch {}
   };
 
   const [wallet, setWallet] = useState<UserWallet>(EMPTY_WALLET);
@@ -419,12 +403,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [language]);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_WALLET_KEY);
-    } catch {}
-
+    try { localStorage.removeItem(LOCAL_STORAGE_WALLET_KEY); } catch {}
     void refreshWallet();
-
     if (!isSupabaseConfigured) return;
 
     const { data } = onAuthStateChange(() => {
@@ -445,19 +425,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [directVideoIdParam, videos]);
 
-  const toggleLanguage = () => {
-    setLanguage(prev => (prev === 'ar' ? 'en' : 'ar'));
-  };
-
-  const toggleMute = () => {
-    setIsMuted(prev => !prev);
-  };
+  const toggleLanguage = () => setLanguage(prev => (prev === 'ar' ? 'en' : 'ar'));
+  const toggleMute = () => setIsMuted(prev => !prev);
 
   const setUserInterests = (interests: VideoCategory[]) => {
     setUserInterestsState(interests);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_INTERESTS_KEY, JSON.stringify(interests));
-    } catch {}
+    try { localStorage.setItem(LOCAL_STORAGE_INTERESTS_KEY, JSON.stringify(interests)); } catch {}
   };
 
   const updateWalletDetails = (updates: { vodafoneCashNumber?: string; linkedIban?: string }) => {
@@ -488,86 +461,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!settings || !(settings.diamonds_per_egp > 0)) {
       throw new Error('INVALID_WITHDRAWAL_SETTINGS');
     }
-
     const diamonds = Math.round(amountUsd * USD_TO_EGP_RATE * settings.diamonds_per_egp);
     const id = await requestWithdrawal(diamonds, vfNumber);
     await refreshWallet();
     return { id, diamonds };
   };
 
-  const triggerGiftAnimation = (gift: GiftItem, recipientCreator?: Creator): boolean => {
-    if (wallet.coinsBalance < gift.costCoins) {
-      return false;
-    }
-
-    const recipientName = recipientCreator ? recipientCreator.displayName : 'صانع المحتوى';
-
-    setWallet(prev => {
-      const newCoins = prev.coinsBalance - gift.costCoins;
-      const updated: UserWallet = {
-        ...prev,
-        coinsBalance: newCoins,
-        fiatBalance: Number((newCoins * 0.005).toFixed(2)),
-        transactions: [
-          {
-            id: `tx-${Date.now()}`,
-            type: 'gift_sent',
-            amountCoins: gift.costCoins,
-            amountFiat: Number((gift.costCoins * 0.005).toFixed(2)),
-            currency: 'USD',
-            status: 'completed',
-            timestamp: 'الآن',
-            note: `إطلاق مجسم: ${gift.nameAr} إلى ${recipientName}`,
-            paymentMethod: 'vodafone_cash',
-            accountRefMasked: prev.vodafoneCashMasked,
-            referenceNumber: `VF-GIFT-${Date.now().toString().slice(-6)}`,
-          },
-          ...prev.transactions,
-        ],
-      };
-      return updated;
-    });
-
-    if (recipientCreator?.id) {
-      sendGiftRpc({
-        senderId: currentUser.id,
-        recipientId: recipientCreator.id,
-        giftId: gift.id,
-        costCoins: gift.costCoins,
-      }).catch(() => {});
-    }
-
+  const triggerGiftAnimation = (gift: GiftItem, _recipientCreator?: Creator): boolean => {
+    if (wallet.coinsBalance < gift.costCoins) return false;
     setActiveGiftAnimation(gift);
     return true;
   };
 
-  const clearGiftAnimation = () => {
-    setActiveGiftAnimation(null);
-  };
+  const clearGiftAnimation = () => setActiveGiftAnimation(null);
 
   const toggleLike = (videoId: string) => {
     setLikedVideoIds(prev => {
       const next = new Set(prev);
       const isLiked = next.has(videoId);
-      if (isLiked) {
-        next.delete(videoId);
-      } else {
-        next.add(videoId);
-      }
-      try {
-        localStorage.setItem(LOCAL_STORAGE_LIKES_KEY, JSON.stringify(Array.from(next)));
-      } catch {}
+      if (isLiked) next.delete(videoId); else next.add(videoId);
+      try { localStorage.setItem(LOCAL_STORAGE_LIKES_KEY, JSON.stringify(Array.from(next))); } catch {}
 
       setVideos(videoList =>
         videoList.map(v => {
           if (v.id === videoId) {
-            return {
-              ...v,
-              stats: {
-                ...v.stats,
-                likes: isLiked ? v.stats.likes - 1 : v.stats.likes + 1,
-              },
-            };
+            return { ...v, stats: { ...v.stats, likes: isLiked ? v.stats.likes - 1 : v.stats.likes + 1 } };
           }
           return v;
         }),
@@ -580,25 +498,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBookmarkedVideoIds(prev => {
       const next = new Set(prev);
       const isBookmarked = next.has(videoId);
-      if (isBookmarked) {
-        next.delete(videoId);
-      } else {
-        next.add(videoId);
-      }
-      try {
-        localStorage.setItem(LOCAL_STORAGE_BOOKMARKS_KEY, JSON.stringify(Array.from(next)));
-      } catch {}
+      if (isBookmarked) next.delete(videoId); else next.add(videoId);
+      try { localStorage.setItem(LOCAL_STORAGE_BOOKMARKS_KEY, JSON.stringify(Array.from(next))); } catch {}
 
       setVideos(videoList =>
         videoList.map(v => {
           if (v.id === videoId) {
-            return {
-              ...v,
-              stats: {
-                ...v.stats,
-                bookmarks: isBookmarked ? v.stats.bookmarks - 1 : v.stats.bookmarks + 1,
-              },
-            };
+            return { ...v, stats: { ...v.stats, bookmarks: isBookmarked ? v.stats.bookmarks - 1 : v.stats.bookmarks + 1 } };
           }
           return v;
         }),
@@ -610,14 +516,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleFollow = (creatorId: string) => {
     setFollowingCreatorIds(prev => {
       const next = new Set(prev);
-      if (next.has(creatorId)) {
-        next.delete(creatorId);
-      } else {
-        next.add(creatorId);
-      }
-      try {
-        localStorage.setItem(LOCAL_STORAGE_FOLLOWS_KEY, JSON.stringify(Array.from(next)));
-      } catch {}
+      if (next.has(creatorId)) next.delete(creatorId); else next.add(creatorId);
+      try { localStorage.setItem(LOCAL_STORAGE_FOLLOWS_KEY, JSON.stringify(Array.from(next))); } catch {}
       return next;
     });
   };
@@ -639,24 +539,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
     };
 
-    setComments(prev => {
-      const list = prev[videoId] || [];
-      return {
-        ...prev,
-        [videoId]: [newComment, ...list],
-      };
-    });
-
+    setComments(prev => ({ ...prev, [videoId]: [newComment, ...(prev[videoId] || [])] }));
     setVideos(videoList =>
       videoList.map(v => {
         if (v.id === videoId) {
-          return {
-            ...v,
-            stats: {
-              ...v.stats,
-              comments: v.stats.comments + 1,
-            },
-          };
+          return { ...v, stats: { ...v.stats, comments: v.stats.comments + 1 } };
         }
         return v;
       }),
@@ -664,23 +551,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const likeComment = (videoId: string, commentId: string) => {
-    setComments(prev => {
-      const list = prev[videoId] || [];
-      return {
-        ...prev,
-        [videoId]: list.map(c => {
-          if (c.id === commentId) {
-            const isLiked = !c.isLiked;
-            return {
-              ...c,
-              isLiked,
-              likes: isLiked ? c.likes + 1 : c.likes - 1,
-            };
-          }
-          return c;
-        }),
-      };
-    });
+    setComments(prev => ({
+      ...prev,
+      [videoId]: (prev[videoId] || []).map(c => {
+        if (c.id !== commentId) return c;
+        const isLiked = !c.isLiked;
+        return { ...c, isLiked, likes: isLiked ? c.likes + 1 : c.likes - 1 };
+      }),
+    }));
   };
 
   const publishVideo = (data: {
@@ -703,13 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       category: data.category,
       author: currentUser,
       music: data.music || TRENDING_SOUNDS[0],
-      stats: {
-        likes: 1,
-        comments: 0,
-        bookmarks: 0,
-        shares: 0,
-        views: 1,
-      },
+      stats: { likes: 1, comments: 0, bookmarks: 0, shares: 0, views: 1 },
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
       filterApplied: data.filterApplied,
       privacy: data.privacy || 'public',
@@ -719,10 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setVideos(prev => {
       const updated = [newVideo, ...prev.filter(v => v.id !== newVideo.id)];
-      try {
-        const userUploadedOnly = updated.filter(v => v.isUserUploaded);
-        localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(userUploadedOnly));
-      } catch {}
+      try { localStorage.setItem(LOCAL_STORAGE_VIDEOS_KEY, JSON.stringify(updated.filter(v => v.isUserUploaded))); } catch {}
       return updated;
     });
 
@@ -730,31 +599,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newVideo;
   };
 
-  const updateCurrentUser = (updates: Partial<Creator>) => {
-    setCurrentUser(prev => ({ ...prev, ...updates }));
-  };
+  const updateCurrentUser = (updates: Partial<Creator>) => setCurrentUser(prev => ({ ...prev, ...updates }));
 
   const filteredVideos = React.useMemo(() => {
     let list = videos.filter(v => {
-      if (v.privacy === 'only_me') {
-        return v.author.id === currentUser.id;
-      }
-      if (v.privacy === 'private_link') {
-        return directVideoIdParam === v.id || v.author.id === currentUser.id;
-      }
+      if (v.privacy === 'only_me') return v.author.id === currentUser.id;
+      if (v.privacy === 'private_link') return directVideoIdParam === v.id || v.author.id === currentUser.id;
       return true;
     });
 
     if (feedType === 'following') {
       const followingList = list.filter(v => followingCreatorIds.has(v.author.id) || v.isUserUploaded);
-      if (followingList.length > 0) {
-        list = followingList;
-      }
+      if (followingList.length > 0) list = followingList;
     } else {
       list.sort((a, b) => {
         if (directVideoIdParam && a.id === directVideoIdParam) return -1;
         if (directVideoIdParam && b.id === directVideoIdParam) return 1;
-
         const aMatchesInterest = userInterests.includes(a.category);
         const bMatchesInterest = userInterests.includes(b.category);
         if (aMatchesInterest && !bMatchesInterest) return -1;
@@ -857,6 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         wallet,
         isWalletModalOpen,
         setIsWalletModalOpen,
+        updateWalletDetails,
         walletStatus,
         refreshWallet,
         submitDeposit,
@@ -883,9 +744,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
+  if (!context) throw new Error('useApp must be used within an AppProvider');
   return context;
 };
 
